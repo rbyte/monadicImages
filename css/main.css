@@ -1,4 +1,21 @@
-* {
-	margin: 0;
-	padding: 0;
+
+
+body {
+	font: 10px sans-serif;
 }
+
+.bar rect {
+	fill: steelblue;
+	shape-rendering: crispEdges;
+}
+
+.bar text {
+	fill: #fff;
+}
+
+.axis path, .axis line {
+	fill: none;
+	stroke: #000;
+	shape-rendering: crispEdges;
+}
+
