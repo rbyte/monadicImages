@@ -33,16 +33,58 @@ withLoadedJSONfiles(jsons, function([fileList, similarity]) {
 	var flatSim = [].concat(...similarity)
 	
 	
-	createHistogram(flatSim)
-
-
-
-
-
-
-
+	//createHistogram(flatSim)
 	
+	pixi(fileList)
 })
+
+
+
+function pixi(fileList) {
+	var w = 2100, h = 1200
+	var renderer = new PIXI.WebGLRenderer(w, h)
+	document.body.appendChild(renderer.view)
+	var stage = new PIXI.Container()
+	
+	// The ParticleContainer class is a really fast version of the Container built solely for speed, so use when you need a lot of sprites or particles. The tradeoff of the ParticleContainer is that advanced functionality will not work. ParticleContainer implements only the basic object transform (position, scale, rotation). Any other functionality like tinting, masking, etc will not work on sprites in this batch.
+	var container = new PIXI.ParticleContainer()
+	stage.addChild(container)
+	allImages = []
+	
+	function loadImageInPixi(path) {
+		var sprite = new PIXI.Sprite.fromImage(path)
+		sprite.position.x = Math.random()*w
+		sprite.position.y = Math.random()*h
+		//sprite.scale.x = 0.5
+		//sprite.scale.y = 0.5
+		allImages.push(sprite)
+		//container.addChild(sprite)
+		stage.addChild(sprite)
+	}
+	
+	// firefox: about:config: layers.acceleration.draw-fps
+	// ~40 fps with 2260 images
+	// ~10 fps with 22600 images
+	new Array(20).fill(0).forEach(() => 
+		fileList.forEach(file => loadImageInPixi("images/area1000/"+file))
+	)
+	
+	function animate() {
+		// start the timer for the next animation loop
+		requestAnimationFrame(animate)
+		
+		// rotation not slower than moving
+		// each frame we spin the image around a bit
+		allImages.forEach(img => img.rotation += Math.random()/100)
+		
+		
+		// this is the main render call that makes pixi draw your container and its children.
+		renderer.render(stage)
+	}
+	animate()
+}
+
+
 
 function createHistogram(values) {
 	// Generate a Bates distribution of 10 random variables.

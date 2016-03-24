@@ -20,6 +20,7 @@ resizeOriginalImagesToArea() {
 }
 
 # in pixels
+resizeOriginalImagesToArea 1000
 resizeOriginalImagesToArea 10000
 resizeOriginalImagesToArea 100000
 resizeOriginalImagesToArea 1000000
