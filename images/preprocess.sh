@@ -68,7 +68,18 @@ createJSONthatListsAllImages() {
 	cd ..
 }
 
+createJSONthatListsAllImageCreationTimestaps() {
+	cd original
+	rm created.json
+	echo "[" >> created.json
+	for f in *.jpg; do echo "\"$(identify -format '%[exif:DateTimeOriginal]' $f)\"," >> created.json; done
+	sed -i '$ s/.$//' created.json
+	echo "]" >> created.json
+	cd ..
+}
+
 createJSONthatListsAllImages
+createJSONthatListsAllImageCreationTimestaps
 
 node generateCompareMatrix.js
 

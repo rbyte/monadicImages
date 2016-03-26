@@ -17,12 +17,34 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 }
 
 
-var jsons = ["images/original/fileList.json", "images/compMatrix.json"]
+var jsons = [
+	"images/original/fileList.json",
+	"images/compMatrix.json",
+	"images/original/created.json"]
 var resolutions = ["area10000", "area100000", "area1000000"]
 
-
-withLoadedJSONfiles(jsons, function([fileList, similarity]) {
+withLoadedJSONfiles(jsons, function([fileList, similarity, created]) {
 	console.log(fileList)
+	console.log(created)
+	created.forEach(function(e) {
+		if (e) { // some images may not have EXIF data, e.g. panoramas
+			// "2008:10:11 16:42:31"
+			var match = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(e)
+			// new Date(year, month, day, hour, minute, second, millisecond);
+			var date = new Date(
+				Number(match[1]),
+				Number(match[2]) - 1, // month
+				Number(match[3]),
+				Number(match[4]),
+				Number(match[5]),
+				Number(match[6])
+			)
+			// TODO do something with this
+			console.log(e, date)
+		}
+	})
+	
+	
 	// similarity[i][j] refers to fileList[i] & fileList[j]
 	// high value is low similarity
 	similarity.forEach((e, i) => console.assert(similarity[i].length === similarity.length))

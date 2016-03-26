@@ -18,4 +18,6 @@ compare.forEach(function(e) {
 
 fs.writeFile("compMatrix.json", JSON.stringify(compMatrix), function(err) {})
 
+
+
 console.log("done")
