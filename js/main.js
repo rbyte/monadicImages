@@ -22,12 +22,16 @@ var jsons = [
 	"images/compMatrix.json",
 	"images/original/created.json"]
 var resolutions = ["area10000", "area100000", "area1000000"]
+var w = 1500, h = 800
+var canvasContainer
+var pixiRenderer
+var transition = false
 
 withLoadedJSONfiles(jsons, function([fileList, similarity, created]) {
 	// indices are the same across input arrays!
 	// retain indices for later referencing (after sort reordered array)
 	var images = fileList.map((e,i) => ({file: e, index: i}))
-	
+	canvasContainer = document.getElementById("canvasContainer")
 	
 	created = created.forEach(function(e, i) {
 		if (e) { // some images may not have EXIF data, e.g. panoramas
@@ -67,7 +71,7 @@ withLoadedJSONfiles(jsons, function([fileList, similarity, created]) {
 		return a.date < b.date ? -1 : 1
 	})
 	
-	images = images.slice(0, 20)
+	images = images.slice(0, 40)
 	
 	//createHistogram(flatSim)
 	pixi(images)
@@ -82,19 +86,55 @@ function polarCoordinates(w, h, alpha, r) {
 	return p
 }
 
+
+
 function positionImage(w, h, image) {
-	var p = polarCoordinates(w, h, image.alpha, image.r)
+	var alpha, r, scale
+	
+	if (transition) {
+		var dt = Date.now() - transition.start
+		var progress = dt / transition.durationMS
+		if (progress > 1) {
+			progress = 1
+			transition = false
+		}
+		
+		var start = image.transitionStart
+		var end = image
+		
+		alpha = start.alpha + (end.alpha - start.alpha) * progress
+		r = start.r + (end.r - start.r) * progress
+		scale = start.scale + (end.scale - start.scale) * progress
+	} else {
+		alpha = image.alpha
+		r = image.r
+		scale = image.scale
+	}
+	r *= Math.min(w,h)
+	
+	var p = polarCoordinates(w, h, alpha, r)
 	image.sprite.position.x = p.x
 	image.sprite.position.y = p.y
+	image.sprite.scale.x = scale
+	image.sprite.scale.y = scale
 }
 
-
+function updateScreenElemsSize() {
+	var bb = canvasContainer.getBoundingClientRect()
+	if (bb.width <= 0 || bb.height <= 0)
+		return
+	w = bb.width
+	h = bb.height
+	pixiRenderer.resize(w, h)
+}
 
 function pixi(images) {
-	var w = 1500, h = 800
-	var renderer = new PIXI.WebGLRenderer(w, h)
-	document.body.appendChild(renderer.view)
+	pixiRenderer = new PIXI.WebGLRenderer(w, h)
+	canvasContainer.appendChild(pixiRenderer.view)
 	var stage = new PIXI.Container()
+	
+	window.onresize = function(event) { updateScreenElemsSize() }
+	window.onresize()
 	
 	// The ParticleContainer class is a really fast version of the Container built solely for speed, so use when you need a lot of sprites or particles. The tradeoff of the ParticleContainer is that advanced functionality will not work. ParticleContainer implements only the basic object transform (position, scale, rotation). Any other functionality like tinting, masking, etc will not work on sprites in this batch.
 	var container = new PIXI.ParticleContainer()
@@ -105,12 +145,11 @@ function pixi(images) {
 	function loadImageInPixi(image) {
 		var sprite = new PIXI.Sprite.fromImage("images/area10000/"+image.file)
 		image.sprite = sprite
-		image.alpha = alpha
-		image.r = Math.min(w,h)*0.3
-		
 		// alpha = 0 is EAST
-		//var p = polarCoordinates(w, h, image.alpha, image.r)
-		positionImage(w, h, image)
+		image.alpha = alpha
+		image.r = 0.3
+		image.scale = 0.7
+		
 		alpha += 1/images.length*2*Math.PI
 		sprite.interactive = true
 		// turns pointer to hand on mouseover
@@ -123,30 +162,35 @@ function pixi(images) {
 		}
 		
 		sprite.on('mousedown', onButtonDown)
-		
 		sprite.anchor.x = 0.5
 		sprite.anchor.y = 0.5
-		sprite.scale.x = 0.7
-		sprite.scale.y = 0.7
 		stage.addChild(sprite)
 	}
 	
+	function startTransition() {
+		transition = {
+			start: Date.now(),
+			durationMS: 300
+		}
+		images.forEach(e => {
+			e.transitionStart = {
+				r: e.r,
+				alpha: e.alpha,
+				scale: e.scale
+			}
+		})
+	}
+	
 	function centerImage(image) {
+		startTransition()
 		images.forEach(img => {
 			var similarity = image.similarity[img.index]
-			
-			img.r = Math.min(w,h)*0.2 + similarity*Math.min(w,h)*1.2
-			
-			img.sprite.scale.x = 0.7 - similarity
-			img.sprite.scale.y = 0.7 - similarity
-			
-			positionImage(w, h, img)
+			img.r = 0.2 + similarity*1.2
+			img.scale = 0.9 - similarity
 		})
 		
-		image.sprite.scale.x = 1
-		image.sprite.scale.y = 1
 		image.r = 0
-		positionImage(w, h, image)
+		image.scale = 1.3
 	}
 	
 	// firefox: about:config: layers.acceleration.draw-fps
@@ -162,14 +206,8 @@ function pixi(images) {
 	function animate() {
 		// start the timer for the next animation loop
 		requestAnimationFrame(animate)
-		
-		// rotation not slower than moving
-		// each frame we spin the image around a bit
-		//images.forEach(img => img.sprite.rotation += Math.random()/100)
-		
-		
-		// this is the main render call that makes pixi draw your container and its children.
-		renderer.render(stage)
+		images.forEach(img => positionImage(w, h, img))
+		pixiRenderer.render(stage)
 	}
 	animate()
 }
