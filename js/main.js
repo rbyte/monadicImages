@@ -18,51 +18,19 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 
 
 var jsons = [
-	"images/original/fileList.json",
-	"images/compMatrix.json",
-	"images/original/created.json"]
+	"images/images.json"]
 var resolutions = ["area10000", "area100000", "area1000000"]
 var w = 1500, h = 800
 var canvasContainer
 var pixiRenderer
 var transition = false
 
-withLoadedJSONfiles(jsons, function([fileList, similarity, created]) {
-	// indices are the same across input arrays!
+withLoadedJSONfiles(jsons, function([images]) {
 	// retain indices for later referencing (after sort reordered array)
-	var images = fileList.map((e,i) => ({file: e, index: i}))
-	canvasContainer = document.getElementById("canvasContainer")
+	// important for similarity indices
+	images.forEach((e,i) => e.index = i)
 	
-	created = created.forEach(function(e, i) {
-		if (e) { // some images may not have EXIF data, e.g. panoramas
-			// "2008:10:11 16:42:31"
-			var match = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(e)
-			// new Date(year, month, day, hour, minute, second, millisecond);
-			var date = new Date(
-				Number(match[1]),
-				Number(match[2]) - 1, // month
-				Number(match[3]),
-				Number(match[4]),
-				Number(match[5]),
-				Number(match[6])
-			)
-			images[i].date = date
-		} else {
-			images[i].date = undefined
-		}
-	})
-	//console.log(created)
-	
-	// similarity[i][j] refers to fileList[i] & fileList[j]
-	// high value is low similarity
-	similarity.forEach((e, i) => console.assert(similarity[i].length === similarity.length))
-	similarity.forEach((e, i) => console.assert(similarity[i][i] === 0))
-	// normalise into [0,1]
-	var max = Math.max(...similarity.map(arr => Math.max(...arr)))
-	similarity = similarity.map(arr => arr.map(e => e/max))
-	
-	similarity.forEach((arr,i) => images[i].similarity = arr)
-	var flatSim = [].concat(...similarity)
+	images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
 	
 	images.sort((a,b) => {
 		// compare by date, fall back to compare by name if no date available
@@ -71,9 +39,14 @@ withLoadedJSONfiles(jsons, function([fileList, similarity, created]) {
 		return a.date < b.date ? -1 : 1
 	})
 	
-	images = images.slice(0, 40)
-	
+	var flatSim = [].concat(...images.map(e => e.similarity))
 	//createHistogram(flatSim)
+	
+	// firefox: about:config: layers.acceleration.draw-fps
+	// ~40 fps with 2260 images
+	// ~10 fps with 22600 images
+	// reduce number of rendered images
+	images = images.slice(0, 40)
 	pixi(images)
 })
 
@@ -129,6 +102,7 @@ function updateScreenElemsSize() {
 }
 
 function pixi(images) {
+	canvasContainer = document.getElementById("canvasContainer")
 	pixiRenderer = new PIXI.WebGLRenderer(w, h)
 	canvasContainer.appendChild(pixiRenderer.view)
 	var stage = new PIXI.Container()
@@ -192,13 +166,6 @@ function pixi(images) {
 		image.r = 0
 		image.scale = 1.3
 	}
-	
-	// firefox: about:config: layers.acceleration.draw-fps
-	// ~40 fps with 2260 images
-	// ~10 fps with 22600 images
-	new Array(1).fill(0).forEach(() =>
-		images.forEach(e => loadImageInPixi(e))
-	)
 	
 	centerImage(images[0])
 	
