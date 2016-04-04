@@ -26,8 +26,4 @@ resizeOriginalImagesToArea 10000
 resizeOriginalImagesToArea 100000
 resizeOriginalImagesToArea 1000000
 
-
-node preprocess.js
-node generateCompareMatrix.js
-
-echo "done sh"
+echo "done"
