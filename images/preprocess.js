@@ -2,6 +2,7 @@ var fs = require('fs')
 var threadPool = require('./threadPool.js')
 
 var originalPath = "original/"
+//var originalPath = "original/"
 
 console.assert(fs.statSync(originalPath).isDirectory())
 
@@ -22,9 +23,11 @@ areasToCreate.forEach(area => {
 })
 threadPool.run(() => console.log("done resizing"))
 
+
 images.forEach((img1, i) => {
 	// get date of creation of image
 	var cmd = "identify -format '%[exif:DateTimeOriginal]' "+originalPath+img1.file
+	//if (false)
 	threadPool.add(cmd, function(error, stdout, stderr) {
 		// some images may not have EXIF data, e.g. panoramas
 		// "2008:10:11 16:42:31"
@@ -39,30 +42,35 @@ images.forEach((img1, i) => {
 		}
 	})
 	
-	// use smallest images for comparision, because this is time-consuming
-	var pathForSimilarity = "area"+areasToCreate[0]+"/"
+	// use smallest images for comparison, because it is time-consuming
+	var pathForSimilarity = "area1000/"
 	images.forEach((img2, j) => {
 		// we only need to compare on half of the 2D matrix
 		if (j >= i) {
 			var cmd = "compare -metric PHASH "+pathForSimilarity+img1.file+" "+pathForSimilarity+img2.file+" /dev/null 2>&1"
 			threadPool.add(cmd, function(error, stdout, stderr) {
-				images[i].similarity[j] = Number(stdout)
-				images[j].similarity[i] = Number(stdout)
+				var num = Number(stdout)
+				images[i].similarity[j] = num
+				images[j].similarity[i] = num
 			})
 		}
 	})
 })
 
-if (false)
 threadPool.run(function() {
 	console.log("thread run done")
+	
+	console.assert(images.map(e => e.similarity.every(x => typeof x === "number")).every(x => x))
 	
 	// high value is low similarity
 	// normalise into [0,1]
 	var max = Math.max(...images.map(e => Math.max(...e.similarity)))
-	images.forEach(e => e.similarity = e.similarity.map(e => e/max))
+	console.log(max)
+	images.forEach(e => e.similarity = e.similarity.map(e => Number((e/max).toFixed(4))))
+	
+	console.assert(images.map(e => e.similarity.every(x => typeof x === "number")).every(x => x))
 	
 	fs.writeFile("images.json", JSON.stringify(images), function(err) {})
+	
+	console.log("all done")
 })
-
-console.log("script done")

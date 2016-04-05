@@ -9,7 +9,7 @@ function add(cmd, callback = () => {}) {
 	queue.push({cmd: cmd, callback: callback, done: false})
 }
 
-function run(runCallback = () => {}, numThreads = 4) {
+function run(runCallback = () => {}, numThreads = 8) {
 	if (queue.length === 0)
 		return runCallback()
 	var threads = []
@@ -17,7 +17,7 @@ function run(runCallback = () => {}, numThreads = 4) {
 	var percent = "0"
 	var startTime = Date.now()
 	// avoid creating threads that will do nothing
-	numThreads = Math.min(1, numThreads, queue.length)
+	numThreads = Math.min(numThreads, Math.max(1, queue.length))
 	
 	function scheduleNextInLine(thread) {
 		if (position < queue.length) {
