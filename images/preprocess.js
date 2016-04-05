@@ -59,16 +59,14 @@ images.forEach((img1, i) => {
 
 threadPool.run(function() {
 	console.log("thread run done")
+	fs.writeFile("images.json", JSON.stringify(images), function(err) {})
 	
-	console.assert(images.map(e => e.similarity.every(x => typeof x === "number")).every(x => x))
+	console.assert(images.map(e => e.similarity.every(x => typeof x === "number" && !isNaN(x))).every(x => x))
 	
 	// high value is low similarity
 	// normalise into [0,1]
 	var max = Math.max(...images.map(e => Math.max(...e.similarity)))
-	console.log(max)
 	images.forEach(e => e.similarity = e.similarity.map(e => Number((e/max).toFixed(4))))
-	
-	console.assert(images.map(e => e.similarity.every(x => typeof x === "number")).every(x => x))
 	
 	fs.writeFile("images.json", JSON.stringify(images), function(err) {})
 	

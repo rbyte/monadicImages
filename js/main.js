@@ -32,6 +32,7 @@ withLoadedJSONfiles(jsons, function([images]) {
 	
 	images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
 	
+	if (false)
 	images.sort((a,b) => {
 		// compare by date, fall back to compare by name if no date available
 		if (!a.date || !b.date)
@@ -47,6 +48,7 @@ withLoadedJSONfiles(jsons, function([images]) {
 	// ~10 fps with 22600 images
 	// reduce number of rendered images
 	images = images.slice(0, 40)
+	console.log(images)
 	pixi(images)
 })
 
@@ -118,6 +120,7 @@ function pixi(images) {
 	
 	function loadImageInPixi(image) {
 		var sprite = new PIXI.Sprite.fromImage("images/area10000/"+image.file)
+		console.assert(sprite)
 		image.sprite = sprite
 		// alpha = 0 is EAST
 		image.alpha = alpha
@@ -167,15 +170,16 @@ function pixi(images) {
 		image.scale = 1.3
 	}
 	
+	images.forEach(img => loadImageInPixi(img))
 	centerImage(images[0])
 	
-		
 	function animate() {
 		// start the timer for the next animation loop
 		requestAnimationFrame(animate)
 		images.forEach(img => positionImage(w, h, img))
 		pixiRenderer.render(stage)
 	}
+	
 	animate()
 }
 

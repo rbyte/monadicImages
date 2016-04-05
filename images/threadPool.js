@@ -9,7 +9,7 @@ function add(cmd, callback = () => {}) {
 	queue.push({cmd: cmd, callback: callback, done: false})
 }
 
-function run(runCallback = () => {}, numThreads = 8) {
+function run(runCallback = () => {}, numThreads = 4) {
 	if (queue.length === 0)
 		return runCallback()
 	var threads = []
@@ -33,15 +33,14 @@ function run(runCallback = () => {}, numThreads = 8) {
 		threads.push(thread)
 		thread.on('message', function(msg) {
 			if (msg.title === "task completed") {
+				scheduleNextInLine(thread)
 				var newPercent = Number(position/queue.length*100).toFixed(0)
 				if (showProgress && newPercent !== percent && Date.now()-startTime > 2000) {
 					percent = newPercent
 					console.log(percent+"%")
 				}
 				var e = queue[msg.position]
-				e.callback(msg.error, msg.stdout, msg.stderr)
 				e.done = true
-				scheduleNextInLine(thread)
 				
 				if (queue.every(e => e.done)) {
 					queue = []
@@ -49,9 +48,13 @@ function run(runCallback = () => {}, numThreads = 8) {
 					threads = []
 					runCallback()
 				}
+				// at the end, in case that takes a long time
+				e.callback(msg.error, msg.stdout, msg.stderr)
 			}
 		})
 		
+		// number of items that any one thread is working on at once
+		scheduleNextInLine(thread)
 		scheduleNextInLine(thread)
 	})
 }
