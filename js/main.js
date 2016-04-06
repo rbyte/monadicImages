@@ -17,8 +17,8 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 }
 
 
-var jsons = ["images/imagesRich.json"]
-var resolutions = ["area10000", "area100000", "area1000000"]
+var jsons = ["images/vangogh.json"]
+var resolutions = ["area1000", "area10000", "area100000", "area1000000"]
 var w = 1500, h = 800
 var canvasContainer
 var pixiRenderer
@@ -30,8 +30,16 @@ withLoadedJSONfiles(jsons, function([images]) {
 	images.forEach((e,i) => e.index = i)
 	
 	images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
+	
 	// VAN GOGH ONLY
 	images.forEach(e => e.date = new Date(e.yearDrawn,1,1,1,1,1,1))
+	
+	
+	// similarity histogram equalization (specific to VANGOGH)
+	images.forEach(e => e.similarity = e.similarity.map(x => Math.pow(x, 0.25)))
+	var spreadCenterToCorners = x => Math.atan((x-0.5)*6)/2.5+0.5 // [0,1] => [0,1]
+	images.forEach(e => e.similarity = e.similarity.map(x => spreadCenterToCorners(x)))
+	
 	
 	images.sort((a,b) => {
 		// compare by date, fall back to compare by name if no date available
@@ -40,15 +48,14 @@ withLoadedJSONfiles(jsons, function([images]) {
 		return a.date < b.date ? -1 : 1
 	})
 	
-	var flatSim = [].concat(...images.map(e => e.similarity))
+	//var flatSim = [].concat(...images.map(e => e.similarity))
 	//createHistogram(flatSim)
 	
 	// firefox: about:config: layers.acceleration.draw-fps
 	// ~40 fps with 2260 images
 	// ~10 fps with 22600 images
 	// reduce number of rendered images
-	images = images.slice(0, 40)
-	console.log(images)
+	//images = images.slice(0, 80)
 	pixi(images)
 })
 
@@ -100,6 +107,7 @@ function updateScreenElemsSize() {
 		return
 	w = bb.width
 	h = bb.height
+	console.log(w, h)
 	pixiRenderer.resize(w, h)
 }
 
@@ -162,12 +170,12 @@ function pixi(images) {
 		startTransition()
 		images.forEach(img => {
 			var similarity = image.similarity[img.index]
-			img.r = 0.2 + similarity*1.2
-			img.scale = 0.9 - similarity
+			img.r = 0.1 + similarity*0.6
+			img.scale = 0.7 - similarity*0.5
 		})
 		
 		image.r = 0
-		image.scale = 1.3
+		image.scale = 1.5
 	}
 	
 	images.forEach(img => loadImageInPixi(img))
@@ -193,7 +201,7 @@ function createHistogram(values) {
 	var formatCount = d3.format(",.0f");
 	
 	var margin = {top: 10, right: 30, bottom: 30, left: 30},
-		width = 960 - margin.left - margin.right,
+		width = 1500 - margin.left - margin.right,
 		height = 500 - margin.top - margin.bottom;
 	
 	var x = d3.scale.linear()
@@ -202,7 +210,7 @@ function createHistogram(values) {
 
 // Generate a histogram using twenty uniformly-spaced bins.
 	var data = d3.layout.histogram()
-		.bins(x.ticks(20))
+		.bins(x.ticks(100))
 		(values);
 	
 	var y = d3.scale.linear()
