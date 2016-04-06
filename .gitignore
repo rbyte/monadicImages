@@ -1,7 +1,4 @@
 workbench/
-images/original/
-images/area*
-images/\!alt
-images/test*
-images/meineBilder/
-images/imagesVanGoghBackup.json
+images/*/
+images/*.csv
+images/*.json

@@ -17,8 +17,7 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 }
 
 
-var jsons = [
-	"images/images.json"]
+var jsons = ["images/imagesRich.json"]
 var resolutions = ["area10000", "area100000", "area1000000"]
 var w = 1500, h = 800
 var canvasContainer
@@ -31,8 +30,9 @@ withLoadedJSONfiles(jsons, function([images]) {
 	images.forEach((e,i) => e.index = i)
 	
 	images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
+	// VAN GOGH ONLY
+	images.forEach(e => e.date = new Date(e.yearDrawn,1,1,1,1,1,1))
 	
-	if (false)
 	images.sort((a,b) => {
 		// compare by date, fall back to compare by name if no date available
 		if (!a.date || !b.date)
