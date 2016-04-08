@@ -18,11 +18,22 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 
 
 var jsons = ["images/vangogh.json"]
-var resolutions = ["area1000", "area10000", "area100000", "area1000000"]
+var availableImageSizesByArea = [1000, 10000, 100000, 1000000]
+var areaUsed = 10000
 var w = 1500, h = 800
 var canvasContainer
 var pixiRenderer
 var transition = false
+
+var distortCircleIntoCanvasRectangle = true
+// relative values
+var rStart = 0.1
+var rEnd = 1.2
+var scaleStart = 0.015
+var scaleEnd = 0.07
+
+var powerSimilarity = 1
+
 
 function prepareVanGoghImages(images) {
 	images.forEach(e => e.date = new Date(e.yearDrawn,1,1,1,1,1,1))
@@ -48,7 +59,7 @@ withLoadedJSONfiles(jsons, function([images]) {
 	// retain indices for later referencing (after sort reordered array)
 	// important for similarity indices
 	images.forEach((e,i) => e.index = i)
-	
+	images.forEach(e => e.getPath = function() { return "images/area"+areaUsed+"/"+this.file })
 	images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
 	
 	// VAN GOGH ONLY
@@ -109,13 +120,21 @@ function positionImage(w, h, image) {
 		scale = image.scale
 	}
 	var circleDiameterPX = Math.min(w,h)
-	var imageAreaPX = 10000
-	var averageImageSideLength = Math.sqrt(imageAreaPX)
+	var averageImageSideLength = Math.sqrt(areaUsed)
 	var scaleFactor = circleDiameterPX / averageImageSideLength
 	
-	r *= circleDiameterPX
+	r *= circleDiameterPX*0.5
 	
 	var p = polarCoordinates(w, h, alpha, r)
+	
+	if (distortCircleIntoCanvasRectangle) {
+		if (w > h) {
+			p.x = (p.x - w/2) * w/h + w/2
+		} else {
+			p.y = (p.y - h/2) * h/w + h/2
+		}
+	}
+	
 	image.sprite.position.x = p.x
 	image.sprite.position.y = p.y
 	image.sprite.scale.x = scale*scaleFactor
@@ -139,19 +158,23 @@ function pixi(images) {
 	
 	window.onresize = function(event) { updateScreenElemsSize() }
 	window.onresize()
-	
-	// relative values [0,1]
-	var rStart = 0.1
-	var rEnd = 0.7
-	var scaleStart = 0.03
-	var scaleEnd = 0.09
+
 	var centeredImage = images[0]
 	
 	function zoom(event) {
 		var wheelMovement = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)))
-		scaleEnd += wheelMovement*0.01
+		// altKey, ctrlKey, shiftKey
+		
+		if (event.shiftKey) {
+			powerSimilarity += wheelMovement*0.05
+		} else {
+			scaleEnd += wheelMovement*0.01
+			// TODO
+			if (event.ctrlKey) {
+			} else {
+			}
+		}
 		updateImages()
-		console.log(scaleEnd)
 	}
 	
 	// IE9, Chrome, Safari, Opera
@@ -162,13 +185,13 @@ function pixi(images) {
 	// The ParticleContainer class is a really fast version of the Container built solely for speed, so use when you need a lot of sprites or particles. The tradeoff of the ParticleContainer is that advanced functionality will not work. ParticleContainer implements only the basic object transform (position, scale, rotation). Any other functionality like tinting, masking, etc will not work on sprites in this batch.
 	var container = new PIXI.ParticleContainer()
 	stage.addChild(container)
-	var alpha = 0
+	
 	
 	function loadAllImages(callback) {
 		// image loading so not synchronous in PIXI.Texture and PIXI.Sprite.
 		// make sure everything is cached before continuing
 		var loader = new PIXI.loaders.Loader()
-		images.forEach(image => loader.add(image.file, "images/area10000/"+image.file))
+		images.forEach(image => loader.add(image.file, image.getPath()))
 		loader.once('complete', () => {
 			console.log("all done loading!")
 			images.forEach(image => initImage(image))
@@ -178,21 +201,22 @@ function pixi(images) {
 		loader.load()
 	}
 	
+	var alpha = 0
 	function initImage(image) {
-		var texture = new PIXI.Texture.fromImage("images/area10000/"+image.file)
+		var texture = new PIXI.Texture.fromImage(image.getPath())
 		image.texture = texture
 		// PIXI.Sprite width & height refers to the actual on-canvas size, not the resolution of the source image
 		image.resolution = {width: texture.width, height: texture.height}
 		console.assert(image.resolution.width !== 0 && image.resolution.height !== 0)
 		
 		var sprite = new PIXI.Sprite(texture)
-		//var sprite = new PIXI.Sprite.fromImage("images/area10000/"+image.file)
 		console.assert(sprite)
 		image.sprite = sprite
+		
 		// alpha = 0 is EAST
 		image.alpha = alpha
-		
 		alpha += 1/images.length*2*Math.PI
+		
 		sprite.interactive = true
 		// turns pointer to hand on mouseover
 		//sprite.buttonMode = true
@@ -226,6 +250,8 @@ function pixi(images) {
 		startTransition()
 		images.forEach(img => {
 			var similarity = centeredImage.similarity[img.index]
+			similarity = Math.pow(similarity, powerSimilarity)
+			
 			img.r = linearInterpolation(rStart, (1-similarity), rEnd)
 			img.scale = linearInterpolation(scaleStart, similarity, scaleEnd)
 		})

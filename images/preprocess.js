@@ -45,7 +45,7 @@ images.forEach((img1, i) => {
 	// use smallest images for comparison, because it is time-consuming
 	var pathForSimilarity = "area1000/"
 	images.forEach((img2, j) => {
-		// we only need to compare on half of the 2D matrix
+		// we only need to compare one half of the 2D matrix
 		if (j >= i) {
 			var cmd = "compare -metric PHASH "+pathForSimilarity+img1.file+" "+pathForSimilarity+img2.file+" /dev/null 2>&1"
 			threadPool.add(cmd, function(error, stdout, stderr) {
