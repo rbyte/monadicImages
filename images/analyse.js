@@ -1,7 +1,6 @@
 var fs = require('fs')
 var images = require("./vangogh.json")
 
-images.forEach(e => delete e.similarity)
-images.forEach(e => delete e.date)
+//images.forEach(e => e.similarity = e.similarity.map(x => 1-x))
 
-fs.writeFile("imagesLean.json", JSON.stringify(images), function(err) {})
+fs.writeFile("vangogh2.json", JSON.stringify(images), function(err) {})

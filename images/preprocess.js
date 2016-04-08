@@ -64,9 +64,9 @@ threadPool.run(function() {
 	console.assert(images.map(e => e.similarity.every(x => typeof x === "number" && !isNaN(x))).every(x => x))
 	
 	// high value is low similarity
-	// normalise into [0,1]
+	// reverse and normalise into [0,1]
 	var max = Math.max(...images.map(e => Math.max(...e.similarity)))
-	images.forEach(e => e.similarity = e.similarity.map(e => Number((e/max).toFixed(4))))
+	images.forEach(e => e.similarity = e.similarity.map(e => Number((1-e/max).toFixed(4))))
 	
 	fs.writeFile("images.json", JSON.stringify(images), function(err) {})
 	
