@@ -2,3 +2,4 @@ workbench/
 images/*/
 images/*.csv
 images/*.json
+node_modules/

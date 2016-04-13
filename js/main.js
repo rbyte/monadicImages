@@ -1,3 +1,5 @@
+//var d3 = require("d3")
+//var PIXI = require("pixi.js")
 
 
 // synchronise xhr onload for all files
@@ -16,7 +18,7 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 	})
 }
 
-
+var τ = Math.PI*2
 var jsons = ["images/vangogh.json"]
 var availableImageSizesByArea = [1000, 10000, 100000, 1000000]
 var areaUsed = 10000
@@ -28,7 +30,7 @@ var transition = false
 var distortCircleIntoCanvasRectangle = true
 // relative values
 var rStart = 0.1
-var rEnd = 1.2
+var rEnd = 0.98
 var scaleStart = 0.015
 var scaleEnd = 0.07
 
@@ -152,7 +154,7 @@ function updateScreenElemsSize() {
 
 function pixi(images) {
 	canvasContainer = document.getElementById("canvasContainer")
-	pixiRenderer = new PIXI.WebGLRenderer(w, h)
+	pixiRenderer = new PIXI.WebGLRenderer(w, h, {transparent: true})
 	canvasContainer.appendChild(pixiRenderer.view)
 	var stage = new PIXI.Container()
 	
@@ -201,7 +203,9 @@ function pixi(images) {
 		loader.load()
 	}
 	
-	var alpha = 0
+	var titelKeilAngle = τ*0.1 // 360° * 10%
+	var alpha = τ*0.5+titelKeilAngle*0.5
+	
 	function initImage(image) {
 		var texture = new PIXI.Texture.fromImage(image.getPath())
 		image.texture = texture
@@ -215,7 +219,7 @@ function pixi(images) {
 		
 		// alpha = 0 is EAST
 		image.alpha = alpha
-		alpha += 1/images.length*2*Math.PI
+		alpha += 1/images.length*(τ-titelKeilAngle)
 		
 		sprite.interactive = true
 		// turns pointer to hand on mouseover
@@ -225,7 +229,7 @@ function pixi(images) {
 			updateImages(image)
 		}
 		
-		sprite.on('mousedown', onButtonDown)
+		sprite.on("mousedown", onButtonDown)
 		sprite.anchor.x = 0.5
 		sprite.anchor.y = 0.5
 		stage.addChild(sprite)
