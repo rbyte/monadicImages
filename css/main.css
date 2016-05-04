@@ -34,7 +34,7 @@ body {
 	width: 25%;
 	top: 50%;
 	transform: translate(0, -50%); /* vertical center */
-	z-index: 3;
+	z-index: 2;
 }
 #VanGoghCircleTime {
 	position: fixed;
@@ -42,6 +42,6 @@ body {
 	height: 100%;
 	width: 100%;
 	top: 50%;
-	transform: translate(-50%, -50%); /* vertical center */
+	transform: translate(-50%, -50%);
 	z-index: -1;
 }

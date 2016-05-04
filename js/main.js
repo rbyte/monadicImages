@@ -1,11 +1,70 @@
 //var d3 = require("d3")
 //var PIXI = require("pixi.js")
 
+const τ = Math.PI*2
+const availableImageSizesByArea = [1000, 10000, 100000, 1000000]
+const areaUsed = 10000
+const jsons = ["images/vangogh.json"]
+const distortCircleIntoCanvasRectangle = true
+
+var canvasContainer
+var pixiRenderer
+var transition = false
+
+// relative values
+var w = 1500, h = 800
+var rStart = 0.1
+var rEnd = 0.98
+// the center of mass needs to remain ~1!
+var scaleStart = 0.6
+var scaleEnd = 1.6
+var centerImageScaleFactor = 1 // 3
+var powerSimilarity = 1
+var powerScale = 0
+
+var lastMouseOverSprite
+
+var images
+
+function init() {
+	withLoadedJSONfiles(jsons, function([imgs]) {
+		images = imgs
+		// retain indices for later referencing (after sort reordered array)
+		// important for similarity indices
+		images.forEach((e,i) => e.index = i)
+		images.forEach(e => e.getPath = function() { return "images/area"+areaUsed+"/"+this.file })
+		images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
+		
+		// VAN GOGH ONLY
+		images = prepareVanGoghImages(images)
+		
+		// low value should be low similarity
+		images.forEach(e => e.similarity = e.similarity.map(x => 1-x))
+		
+		images.sort((a,b) => {
+			// compare by date, fall back to compare by name if no date available
+			if (!a.date || !b.date)
+				return a.file < b.file ? -1 : 1
+			return a.date < b.date ? -1 : 1
+		})
+		
+		//var flatSim = [].concat(...images.map(e => e.similarity))
+		//createHistogram(flatSim)
+		
+		// firefox: about:config: layers.acceleration.draw-fps
+		// ~40 fps with 2260 images
+		// ~10 fps with 22600 images
+		// reduce number of rendered images
+		
+		//images = images.slice(0, 500)
+		pixi()
+	})
+}
 
 // synchronise xhr onload for all files
 function withLoadedJSONfiles(fileNamesArray, callback) {
 	var result = new Array(fileNamesArray.length).fill(false)
-		
+	
 	fileNamesArray.forEach(function (e, i) {
 		var xhr = new XMLHttpRequest()
 		xhr.open("GET", e)
@@ -17,25 +76,6 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 		xhr.send()
 	})
 }
-
-var τ = Math.PI*2
-var jsons = ["images/vangogh.json"]
-var availableImageSizesByArea = [1000, 10000, 100000, 1000000]
-var areaUsed = 10000
-var w = 1500, h = 800
-var canvasContainer
-var pixiRenderer
-var transition = false
-
-var distortCircleIntoCanvasRectangle = true
-// relative values
-var rStart = 0.1
-var rEnd = 0.98
-var scaleStart = 0.015
-var scaleEnd = 0.07
-
-var powerSimilarity = 1
-
 
 function prepareVanGoghImages(images) {
 	images.forEach(e => e.date = new Date(e.yearDrawn,1,1,1,1,1,1))
@@ -55,39 +95,6 @@ function prepareVanGoghImages(images) {
 	images.forEach(e => e.similarity = e.similarity.map(x => spreadCenterToCorners(x)))
 	return images
 }
-
-
-withLoadedJSONfiles(jsons, function([images]) {
-	// retain indices for later referencing (after sort reordered array)
-	// important for similarity indices
-	images.forEach((e,i) => e.index = i)
-	images.forEach(e => e.getPath = function() { return "images/area"+areaUsed+"/"+this.file })
-	images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
-	
-	// VAN GOGH ONLY
-	images = prepareVanGoghImages(images)
-	
-	// low value should be low similarity
-	images.forEach(e => e.similarity = e.similarity.map(x => 1-x))
-	
-	images.sort((a,b) => {
-		// compare by date, fall back to compare by name if no date available
-		if (!a.date || !b.date)
-			return a.file < b.file ? -1 : 1
-		return a.date < b.date ? -1 : 1
-	})
-	
-	//var flatSim = [].concat(...images.map(e => e.similarity))
-	//createHistogram(flatSim)
-	
-	// firefox: about:config: layers.acceleration.draw-fps
-	// ~40 fps with 2260 images
-	// ~10 fps with 22600 images
-	// reduce number of rendered images
-	//images = images.slice(0, 80)
-	pixi(images)
-})
-
 
 function polarCoordinates(w, h, alpha, r) {
 	var center = {x: w/2, y: h/2}
@@ -122,8 +129,7 @@ function positionImage(w, h, image) {
 		scale = image.scale
 	}
 	var circleDiameterPX = Math.min(w,h)
-	var averageImageSideLength = Math.sqrt(areaUsed)
-	var scaleFactor = circleDiameterPX / averageImageSideLength
+	var scaleFactor = 1 / Math.sqrt(areaUsed) / Math.sqrt(images.length) * circleDiameterPX
 	
 	r *= circleDiameterPX*0.5
 	
@@ -139,8 +145,12 @@ function positionImage(w, h, image) {
 	
 	image.sprite.position.x = p.x
 	image.sprite.position.y = p.y
-	image.sprite.scale.x = scale*scaleFactor
-	image.sprite.scale.y = scale*scaleFactor
+	var poweredScale = Math.pow(scale, powerScale < 0
+		? 1/(Math.abs(powerScale)+1)
+		: powerScale+1)
+	
+	image.sprite.scale.x = poweredScale*scaleFactor
+	image.sprite.scale.y = poweredScale*scaleFactor
 }
 
 function updateScreenElemsSize() {
@@ -152,7 +162,7 @@ function updateScreenElemsSize() {
 	pixiRenderer.resize(w, h)
 }
 
-function pixi(images) {
+function pixi() {
 	canvasContainer = document.getElementById("canvasContainer")
 	pixiRenderer = new PIXI.WebGLRenderer(w, h, {transparent: true})
 	canvasContainer.appendChild(pixiRenderer.view)
@@ -164,13 +174,21 @@ function pixi(images) {
 	var centeredImage = images[0]
 	
 	function zoom(event) {
+		event.preventDefault()
 		var wheelMovement = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)))
 		// altKey, ctrlKey, shiftKey
 		
 		if (event.shiftKey) {
+			// Firefox: shift + mouseWheel down => go back in history ...
 			powerSimilarity += wheelMovement*0.05
 		} else {
-			scaleEnd += wheelMovement*0.01
+			powerSimilarity += wheelMovement*0.05
+			powerScale += wheelMovement*0.15
+			
+			//scaleStart -= wheelMovement*0.1
+			//scaleEnd += wheelMovement*0.1
+			//rStart += wheelMovement*0.05
+			
 			// TODO
 			if (event.ctrlKey) {
 			} else {
@@ -204,6 +222,7 @@ function pixi(images) {
 	}
 	
 	var titelKeilAngle = τ*0.1 // 360° * 10%
+	// alpha = 0 is EAST
 	var alpha = τ*0.5+titelKeilAngle*0.5
 	
 	function initImage(image) {
@@ -217,7 +236,6 @@ function pixi(images) {
 		console.assert(sprite)
 		image.sprite = sprite
 		
-		// alpha = 0 is EAST
 		image.alpha = alpha
 		alpha += 1/images.length*(τ-titelKeilAngle)
 		
@@ -225,11 +243,18 @@ function pixi(images) {
 		// turns pointer to hand on mouseover
 		//sprite.buttonMode = true
 		
-		var onButtonDown = function(mouseData) {
+		sprite.on("mousedown", function(e) {
 			updateImages(image)
-		}
+		})
+		sprite.on("mouseover", function(e) {
+			var that = this
+			lastMouseOverSprite = this
+			setTimeout(function() {
+				if (that === lastMouseOverSprite)
+					moveToFront(that)
+			}, 300 /*ms*/)
+		})
 		
-		sprite.on("mousedown", onButtonDown)
 		sprite.anchor.x = 0.5
 		sprite.anchor.y = 0.5
 		stage.addChild(sprite)
@@ -249,6 +274,14 @@ function pixi(images) {
 		})
 	}
 	
+	function moveToFront(sprite) {
+		// z-Index is determined by the order of the stage.children array. rearmost are on top
+		// stage.children.sort((a,b) => ...)
+		// move to front
+		stage.removeChild(sprite)
+		stage.addChild(sprite)
+	}
+	
 	function updateImages(newCenter = centeredImage) {
 		centeredImage = newCenter
 		startTransition()
@@ -260,14 +293,14 @@ function pixi(images) {
 			img.scale = linearInterpolation(scaleStart, similarity, scaleEnd)
 		})
 		centeredImage.r = 0
-		centeredImage.scale = scaleEnd*3
+		centeredImage.scale = scaleEnd * centerImageScaleFactor
+		moveToFront(centeredImage.sprite)
 	}
 	
 	function animate() {
-		// start the timer for the next animation loop
-		requestAnimationFrame(animate)
 		images.forEach(img => positionImage(w, h, img))
 		pixiRenderer.render(stage)
+		requestAnimationFrame(animate)
 	}
 	
 	loadAllImages(() => { // then:
@@ -277,13 +310,8 @@ function pixi(images) {
 	
 }
 
-
-
-function createHistogram(values) {
-	// Generate a Bates distribution of 10 random variables.
-//var values = d3.range(1000).map(d3.random.bates(10));
-
-// A formatter for counts.
+// default: Generate a Bates distribution of 10 random variables.
+function createHistogram(values = d3.range(1000).map(d3.random.bates(10))) {
 	var formatCount = d3.format(",.0f");
 	
 	var margin = {top: 10, right: 30, bottom: 30, left: 30},
@@ -294,7 +322,6 @@ function createHistogram(values) {
 		.domain([0, 1])
 		.range([0, width]);
 
-// Generate a histogram using twenty uniformly-spaced bins.
 	var data = d3.layout.histogram()
 		.bins(x.ticks(100))
 		(values);
@@ -336,3 +363,8 @@ function createHistogram(values) {
 		.attr("transform", "translate(0," + height + ")")
 		.call(xAxis);
 }
+
+
+
+
+init()

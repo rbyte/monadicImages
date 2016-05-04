@@ -47,6 +47,7 @@ images.forEach((img1, i) => {
 	images.forEach((img2, j) => {
 		// we only need to compare one half of the 2D matrix
 		if (j >= i) {
+			// Perceptual Hash
 			var cmd = "compare -metric PHASH "+pathForSimilarity+img1.file+" "+pathForSimilarity+img2.file+" /dev/null 2>&1"
 			threadPool.add(cmd, function(error, stdout, stderr) {
 				var num = Number(stdout)
