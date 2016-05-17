@@ -3,7 +3,7 @@
 
 const τ = Math.PI*2
 const availableImageSizesByArea = [1000, 10000, 100000, 1000000]
-const areaUsed = 10000
+const availableImageSizesByAreaToPreload = [true, false, false, false]
 const jsons = ["images/vangogh.json"]
 const distortCircleIntoCanvasRectangle = true
 
@@ -16,9 +16,9 @@ var w = 1500, h = 800
 var rStart = 0.1
 var rEnd = 0.98
 // the center of mass needs to remain ~1!
-var scaleStart = 0.6
-var scaleEnd = 1.6
-var centerImageScaleFactor = 1 // 3
+var scaleStart = 0.7
+var scaleEnd = 1.8
+var centerImageScale = 3
 var powerSimilarity = 1
 var powerScale = 0
 
@@ -32,7 +32,11 @@ function init() {
 		// retain indices for later referencing (after sort reordered array)
 		// important for similarity indices
 		images.forEach((e,i) => e.index = i)
-		images.forEach(e => e.getPath = function() { return "images/area"+areaUsed+"/"+this.file })
+		images.forEach(e => e.areaIdxUsed = 0) // default is smallest
+		images.forEach(e => e.textures = new Array(availableImageSizesByArea.length).fill(false))
+		images.forEach(e => e.getPath = function(areaIdx = this.areaIdxUsed) {
+			return "images/area"+availableImageSizesByArea[areaIdx]+"/"+this.file
+		})
 		images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
 		
 		// VAN GOGH ONLY
@@ -128,8 +132,29 @@ function positionImage(w, h, image) {
 		r = image.r
 		scale = image.scale
 	}
+	var exponent = powerScale < 0
+		? 1/(Math.abs(powerScale)+1) // root: will conform scales
+		: powerScale+1 // power: will spread scales
+	
+	if (r < rStart) { // decrese effect of powerScale on center image
+		var low = 0
+		var rampFrom1down = (r+rStart*low)/(rStart+rStart*low)
+		exponent = Math.pow(exponent, rampFrom1down)
+	}
+	
+	// has scale=1 as center
+	var poweredScale = Math.pow(scale, exponent)
 	var circleDiameterPX = Math.min(w,h)
-	var scaleFactor = 1 / Math.sqrt(areaUsed) / Math.sqrt(images.length) * circleDiameterPX
+	var absoluteScale = poweredScale / Math.sqrt(availableImageSizesByArea[image.areaIdxUsed]) / Math.sqrt(images.length) * circleDiameterPX
+	
+	if (r < rStart) {
+		var rampFrom0up = 1 - r/rStart
+		absoluteScale *= 1 + centerImageScale * rampFrom0up
+		var adjust = 0.4
+		if (powerScale > 0) {
+			absoluteScale *= 1 + powerScale*adjust
+		}
+	}
 	
 	r *= circleDiameterPX*0.5
 	
@@ -145,12 +170,38 @@ function positionImage(w, h, image) {
 	
 	image.sprite.position.x = p.x
 	image.sprite.position.y = p.y
-	var poweredScale = Math.pow(scale, powerScale < 0
-		? 1/(Math.abs(powerScale)+1)
-		: powerScale+1)
 	
-	image.sprite.scale.x = poweredScale*scaleFactor
-	image.sprite.scale.y = poweredScale*scaleFactor
+	image.sprite.scale.x = absoluteScale
+	image.sprite.scale.y = absoluteScale
+	
+	// wait before we update the texture (if areaIdxUsed changed) until next round to avoid stutter
+	image.sprite.texture = image.textures[image.areaIdxUsed]
+	
+	// areas delta is x10, flattened to one dimension: sqrt(10) ~= 3
+	if (absoluteScale < 0.3 && 0 > image.areaIdxUsed-1) {
+		switchToThisAreaAndLoadIfNecessary(image, image.areaIdxUsed-1)
+	}
+	
+	if (absoluteScale > 1.5 && image.areaIdxUsed+1 < availableImageSizesByArea.length) {
+		switchToThisAreaAndLoadIfNecessary(image, image.areaIdxUsed+1)
+	}
+}
+
+function switchToThisAreaAndLoadIfNecessary(image, areaToSetTo) {
+	if (image.textures[areaToSetTo] === false) {
+		image.textures[areaToSetTo] = true // loading
+		var loader = new PIXI.loaders.Loader()
+		loader.add(image.file, image.getPath(areaToSetTo))
+		loader.once('complete', () => {
+			image.areaIdxUsed = areaToSetTo
+			image.textures[image.areaIdxUsed] = new PIXI.Texture.fromImage(image.getPath())
+		})
+		loader.load()
+	}
+	// this should be necessary, but produces errors. hum.
+	// else if (image.textures[areaToSetTo] !== true) {
+	// 	image.areaIdxUsed = areaToSetTo
+	// }
 }
 
 function updateScreenElemsSize() {
@@ -208,10 +259,14 @@ function pixi() {
 	
 	
 	function loadAllImages(callback) {
-		// image loading so not synchronous in PIXI.Texture and PIXI.Sprite.
+		// image loading is not synchronous in PIXI.Texture and PIXI.Sprite.
 		// make sure everything is cached before continuing
 		var loader = new PIXI.loaders.Loader()
-		images.forEach(image => loader.add(image.file, image.getPath()))
+		
+		availableImageSizesByAreaToPreload.forEach((e,i) => {
+			if (e)
+				images.forEach(image => loader.add(image.file+i, image.getPath(i)))
+		})
 		loader.once('complete', () => {
 			console.log("all done loading!")
 			images.forEach(image => initImage(image))
@@ -226,13 +281,12 @@ function pixi() {
 	var alpha = τ*0.5+titelKeilAngle*0.5
 	
 	function initImage(image) {
-		var texture = new PIXI.Texture.fromImage(image.getPath())
-		image.texture = texture
-		// PIXI.Sprite width & height refers to the actual on-canvas size, not the resolution of the source image
-		image.resolution = {width: texture.width, height: texture.height}
-		console.assert(image.resolution.width !== 0 && image.resolution.height !== 0)
+		availableImageSizesByAreaToPreload.forEach((e,i) => {
+			if (e)
+				image.textures[i] = new PIXI.Texture.fromImage(image.getPath(i))
+		})
 		
-		var sprite = new PIXI.Sprite(texture)
+		var sprite = new PIXI.Sprite(image.textures[image.areaIdxUsed])
 		console.assert(sprite)
 		image.sprite = sprite
 		
@@ -293,7 +347,7 @@ function pixi() {
 			img.scale = linearInterpolation(scaleStart, similarity, scaleEnd)
 		})
 		centeredImage.r = 0
-		centeredImage.scale = scaleEnd * centerImageScaleFactor
+		//centeredImage.scale = centerImageScale
 		moveToFront(centeredImage.sprite)
 	}
 	
