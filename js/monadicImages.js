@@ -9,22 +9,27 @@ const distortCircleIntoCanvasRectangle = true
 
 var canvasContainer
 var pixiRenderer
+var stage
 var transition = false
 
 // relative values
 var w = 1500, h = 800
 var rStart = 0.1
-var rEnd = 0.98
+var rEnd = 1.00
 // the center of mass needs to remain ~1!
 var scaleStart = 0.7
 var scaleEnd = 1.8
 var centerImageScale = 3
 var powerSimilarity = 1
 var powerScale = 0
+var titelKeilAngle = τ*0.1 // 360° * 10%
+// alpha = 0 is EAST
+var initalAlpha = τ*0.5+titelKeilAngle*0.5
 
 var lastMouseOverSprite
 
 var images
+var centeredImage
 
 function init() {
 	withLoadedJSONfiles(jsons, function([imgs]) {
@@ -61,8 +66,47 @@ function init() {
 		// reduce number of rendered images
 		
 		//images = images.slice(0, 500)
-		pixi()
+		canvasContainer = document.getElementById("canvasContainer")
+		pixiRenderer = new PIXI.WebGLRenderer(w, h, {transparent: true})
+		canvasContainer.appendChild(pixiRenderer.view)
+		stage = new PIXI.Container()
+		centeredImage = images[0]
+		
+		loadAllImages(() => { // then:
+			updateImages()
+			renderLoop()
+			document.querySelector("#loading").style.display = "none"
+			
+			window.onresize = function(event) { updateScreenElemsSize() }
+			window.onresize()
+			
+			// IE9, Chrome, Safari, Opera
+			canvasContainer.addEventListener("mousewheel", zoom, false)
+			// Firefox
+			canvasContainer.addEventListener("DOMMouseScroll", zoom, false)
+			
+			initSlider("scaleStart")
+			initSlider("scaleEnd")
+			initSlider("rStart")
+			initSlider("rEnd")
+		})
+		
 	})
+}
+
+function initSlider(s) {
+	// is a top level variable
+	console.assert(window[s])
+	var slider = document.querySelector("#"+s)
+	slider.value = window[s]
+	var label = document.querySelector("label[for="+s+"")
+	var setLabel = () => label.innerHTML = s+" "+window[s].toFixed(2)
+	setLabel()
+	slider.oninput = function(e) {
+		window[s] = Number(this.value)
+		setLabel()
+		updateImages()
+	}
 }
 
 // synchronise xhr onload for all files
@@ -136,10 +180,14 @@ function positionImage(w, h, image) {
 		? 1/(Math.abs(powerScale)+1) // root: will conform scales
 		: powerScale+1 // power: will spread scales
 	
-	if (r < rStart) { // decrese effect of powerScale on center image
+	// decrese effect of powerScale on center image
+	if (r < rStart && false) {
 		var low = 0
 		var rampFrom1down = (r+rStart*low)/(rStart+rStart*low)
-		exponent = Math.pow(exponent, rampFrom1down)
+		// exponent = Math.pow(exponent, rampFrom1down)
+		var rampFrom0up = 1 - r/rStart
+		var centerFn = x => 2.5/(x-0.2)+0.3
+		scale *= 1 + centerFn(exponent) * rampFrom0up
 	}
 	
 	// has scale=1 as center
@@ -147,7 +195,9 @@ function positionImage(w, h, image) {
 	var circleDiameterPX = Math.min(w,h)
 	var absoluteScale = poweredScale / Math.sqrt(availableImageSizesByArea[image.areaIdxUsed]) / Math.sqrt(images.length) * circleDiameterPX
 	
-	if (r < rStart) {
+	
+	
+	if (r < rStart && false) {
 		var rampFrom0up = 1 - r/rStart
 		absoluteScale *= 1 + centerImageScale * rampFrom0up
 		var adjust = 0.4
@@ -213,155 +263,134 @@ function updateScreenElemsSize() {
 	pixiRenderer.resize(w, h)
 }
 
-function pixi() {
-	canvasContainer = document.getElementById("canvasContainer")
-	pixiRenderer = new PIXI.WebGLRenderer(w, h, {transparent: true})
-	canvasContainer.appendChild(pixiRenderer.view)
-	var stage = new PIXI.Container()
-	
-	window.onresize = function(event) { updateScreenElemsSize() }
-	window.onresize()
 
-	var centeredImage = images[0]
+function zoom(e) {
+	e.preventDefault()
+	var wheelMovement = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)))
+	// altKey, ctrlKey, shiftKey
 	
-	function zoom(event) {
-		event.preventDefault()
-		var wheelMovement = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)))
-		// altKey, ctrlKey, shiftKey
+	if (e.shiftKey) {
+		// Firefox: shift + mouseWheel down => go back in history ...
+		powerSimilarity += wheelMovement*0.05
+	} else {
+		powerSimilarity += wheelMovement*0.05
+		powerScale += wheelMovement*0.15
 		
-		if (event.shiftKey) {
-			// Firefox: shift + mouseWheel down => go back in history ...
-			powerSimilarity += wheelMovement*0.05
-		} else {
-			powerSimilarity += wheelMovement*0.05
-			powerScale += wheelMovement*0.15
-			
-			//scaleStart -= wheelMovement*0.1
-			//scaleEnd += wheelMovement*0.1
-			//rStart += wheelMovement*0.05
-			
-			// TODO
-			if (event.ctrlKey) {
-			} else {
-			}
-		}
-		updateImages()
-	}
-	
-	// IE9, Chrome, Safari, Opera
-	canvasContainer.addEventListener("mousewheel", zoom, false)
-	// Firefox
-	canvasContainer.addEventListener("DOMMouseScroll", zoom, false)
-	
-	// The ParticleContainer class is a really fast version of the Container built solely for speed, so use when you need a lot of sprites or particles. The tradeoff of the ParticleContainer is that advanced functionality will not work. ParticleContainer implements only the basic object transform (position, scale, rotation). Any other functionality like tinting, masking, etc will not work on sprites in this batch.
-	var container = new PIXI.ParticleContainer()
-	stage.addChild(container)
-	
-	
-	function loadAllImages(callback) {
-		// image loading is not synchronous in PIXI.Texture and PIXI.Sprite.
-		// make sure everything is cached before continuing
-		var loader = new PIXI.loaders.Loader()
+		powerScale = Math.max(-1.5, Math.min(powerScale, 6.5))
 		
-		availableImageSizesByAreaToPreload.forEach((e,i) => {
-			if (e)
-				images.forEach(image => loader.add(image.file+i, image.getPath(i)))
-		})
-		loader.once('complete', () => {
-			console.log("all done loading!")
-			images.forEach(image => initImage(image))
-			console.assert(images.every(e => e.sprite))
-			callback()
-		})
-		loader.load()
+		console.log(powerScale)
 	}
+	updateImages()
+}
+
+function loadAllImages(callback) {
+	// image loading is not synchronous in PIXI.Texture and PIXI.Sprite.
+	// make sure everything is cached before continuing
+	var loader = new PIXI.loaders.Loader()
 	
-	var titelKeilAngle = τ*0.1 // 360° * 10%
-	// alpha = 0 is EAST
-	var alpha = τ*0.5+titelKeilAngle*0.5
-	
-	function initImage(image) {
-		availableImageSizesByAreaToPreload.forEach((e,i) => {
-			if (e)
-				image.textures[i] = new PIXI.Texture.fromImage(image.getPath(i))
-		})
-		
-		var sprite = new PIXI.Sprite(image.textures[image.areaIdxUsed])
-		console.assert(sprite)
-		image.sprite = sprite
-		
-		image.alpha = alpha
-		alpha += 1/images.length*(τ-titelKeilAngle)
-		
-		sprite.interactive = true
-		// turns pointer to hand on mouseover
-		//sprite.buttonMode = true
-		
-		sprite.on("mousedown", function(e) {
-			updateImages(image)
-		})
-		sprite.on("mouseover", function(e) {
-			var that = this
-			lastMouseOverSprite = this
-			setTimeout(function() {
-				if (that === lastMouseOverSprite)
-					moveToFront(that)
-			}, 300 /*ms*/)
-		})
-		
-		sprite.anchor.x = 0.5
-		sprite.anchor.y = 0.5
-		stage.addChild(sprite)
-	}
-	
-	function startTransition() {
-		transition = {
-			start: Date.now(),
-			durationMS: 300
-		}
-		images.forEach(e => {
-			e.transitionStart = {
-				r: e.r,
-				alpha: e.alpha,
-				scale: e.scale
-			}
-		})
-	}
-	
-	function moveToFront(sprite) {
-		// z-Index is determined by the order of the stage.children array. rearmost are on top
-		// stage.children.sort((a,b) => ...)
-		// move to front
-		stage.removeChild(sprite)
-		stage.addChild(sprite)
-	}
-	
-	function updateImages(newCenter = centeredImage) {
-		centeredImage = newCenter
-		startTransition()
-		images.forEach(img => {
-			var similarity = centeredImage.similarity[img.index]
-			similarity = Math.pow(similarity, powerSimilarity)
-			
-			img.r = linearInterpolation(rStart, (1-similarity), rEnd)
-			img.scale = linearInterpolation(scaleStart, similarity, scaleEnd)
-		})
-		centeredImage.r = 0
-		//centeredImage.scale = centerImageScale
-		moveToFront(centeredImage.sprite)
-	}
-	
-	function animate() {
-		images.forEach(img => positionImage(w, h, img))
-		pixiRenderer.render(stage)
-		requestAnimationFrame(animate)
-	}
-	
-	loadAllImages(() => { // then:
-		updateImages()
-		animate()
+	availableImageSizesByAreaToPreload.forEach((e,i) => {
+		if (e)
+			images.forEach(image => loader.add(image.file+i, image.getPath(i)))
+	})
+	loader.once('complete', () => {
+		console.log("all done loading!")
+		images.forEach(image => initImage(image))
+		console.assert(images.every(e => e.sprite))
+		callback()
+	})
+	loader.load()
+}
+
+function initImage(image) {
+	availableImageSizesByAreaToPreload.forEach((e,i) => {
+		if (e)
+			image.textures[i] = new PIXI.Texture.fromImage(image.getPath(i))
 	})
 	
+	var sprite = new PIXI.Sprite(image.textures[image.areaIdxUsed])
+	console.assert(sprite)
+	image.sprite = sprite
+	
+	image.alpha = initalAlpha
+	initalAlpha += 1/images.length*(τ-titelKeilAngle)
+	
+	sprite.interactive = true
+	// turns pointer to hand on mouseover
+	//sprite.buttonMode = true
+	
+	sprite.on("mousedown", function(e) {
+		updateImages(image)
+	})
+	sprite.on("mouseover", function(e) {
+		var that = this
+		lastMouseOverSprite = this
+		setTimeout(function() {
+			if (that === lastMouseOverSprite)
+				moveToFront(that)
+		}, 300 /*ms*/)
+	})
+	
+	sprite.anchor.x = 0.5
+	sprite.anchor.y = 0.5
+	stage.addChild(sprite)
+}
+
+function startTransition() {
+	transition = {
+		start: Date.now(),
+		durationMS: 300
+	}
+	images.forEach(e => {
+		e.transitionStart = {
+			r: e.r,
+			alpha: e.alpha,
+			scale: e.scale
+		}
+	})
+}
+
+function moveToFront(sprite) {
+	// z-Index is determined by the order of the stage.children array. rearmost are on top
+	// stage.children.sort((a,b) => ...)
+	// move to front
+	stage.removeChild(sprite)
+	stage.addChild(sprite)
+}
+
+function updateImages(newCenter = centeredImage) {
+	centeredImage = newCenter
+	
+	var infoBox = document.querySelector("#detailedInfo")
+	while (infoBox.firstChild) {
+		infoBox.removeChild(infoBox.firstChild)
+	}
+	function addPoint(string) {
+		var li = infoBox.appendChild(document.createElement("li"))
+		li.appendChild(document.createTextNode(string))
+	}
+	addPoint(centeredImage.description)
+	addPoint(centeredImage.yearDrawn)
+	addPoint(centeredImage.keywords)
+	addPoint(centeredImage.material)
+	
+	
+	startTransition()
+	images.forEach(img => {
+		var similarity = centeredImage.similarity[img.index]
+		similarity = Math.pow(similarity, powerSimilarity)
+		
+		img.r = linearInterpolation(rStart, (1-similarity), rEnd)
+		img.scale = linearInterpolation(scaleStart, similarity, scaleEnd)
+	})
+	centeredImage.r = 0
+	//centeredImage.scale = centerImageScale
+	moveToFront(centeredImage.sprite)
+}
+
+function renderLoop() {
+	images.forEach(img => positionImage(w, h, img))
+	pixiRenderer.render(stage)
+	requestAnimationFrame(renderLoop)
 }
 
 // default: Generate a Bates distribution of 10 random variables.
