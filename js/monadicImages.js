@@ -19,9 +19,8 @@ var rEnd = 1.00
 // the center of mass needs to remain ~1!
 var scaleStart = 0.7
 var scaleEnd = 1.8
-var centerImageScale = 3
 var powerSimilarity = 1
-var powerScale = 0
+var powerScale = 0.5
 var titelKeilAngle = τ*0.1 // 360° * 10%
 // alpha = 0 is EAST
 var initalAlpha = τ*0.5+titelKeilAngle*0.5
@@ -81,9 +80,9 @@ function init() {
 			window.onresize()
 			
 			// IE9, Chrome, Safari, Opera
-			canvasContainer.addEventListener("mousewheel", zoom, false)
+			canvasContainer.addEventListener("mousewheel", wheelMove, false)
 			// Firefox
-			canvasContainer.addEventListener("DOMMouseScroll", zoom, false)
+			canvasContainer.addEventListener("DOMMouseScroll", wheelMove, false)
 			
 			initSlider("scaleStart")
 			initSlider("scaleEnd")
@@ -180,31 +179,19 @@ function positionImage(w, h, image) {
 		? 1/(Math.abs(powerScale)+1) // root: will conform scales
 		: powerScale+1 // power: will spread scales
 	
-	// decrese effect of powerScale on center image
-	if (r < rStart && false) {
-		var low = 0
-		var rampFrom1down = (r+rStart*low)/(rStart+rStart*low)
-		// exponent = Math.pow(exponent, rampFrom1down)
+	if (r < rStart) {
 		var rampFrom0up = 1 - r/rStart
-		var centerFn = x => 2.5/(x-0.2)+0.3
+		// https://rechneronline.de/funktionsgraphen/
+		// decreases size of center image by suppressing the growth of the exponent
+		var centerFn = x => 0.8/(x-0.6)
 		scale *= 1 + centerFn(exponent) * rampFrom0up
+		// console.log(scale, exponent, centerFn(exponent), absoluteScale)
 	}
 	
 	// has scale=1 as center
 	var poweredScale = Math.pow(scale, exponent)
 	var circleDiameterPX = Math.min(w,h)
 	var absoluteScale = poweredScale / Math.sqrt(availableImageSizesByArea[image.areaIdxUsed]) / Math.sqrt(images.length) * circleDiameterPX
-	
-	
-	
-	if (r < rStart && false) {
-		var rampFrom0up = 1 - r/rStart
-		absoluteScale *= 1 + centerImageScale * rampFrom0up
-		var adjust = 0.4
-		if (powerScale > 0) {
-			absoluteScale *= 1 + powerScale*adjust
-		}
-	}
 	
 	r *= circleDiameterPX*0.5
 	
@@ -220,7 +207,6 @@ function positionImage(w, h, image) {
 	
 	image.sprite.position.x = p.x
 	image.sprite.position.y = p.y
-	
 	image.sprite.scale.x = absoluteScale
 	image.sprite.scale.y = absoluteScale
 	
@@ -228,13 +214,10 @@ function positionImage(w, h, image) {
 	image.sprite.texture = image.textures[image.areaIdxUsed]
 	
 	// areas delta is x10, flattened to one dimension: sqrt(10) ~= 3
-	if (absoluteScale < 0.3 && 0 > image.areaIdxUsed-1) {
+	if (absoluteScale < 0.3 && 0 > image.areaIdxUsed-1)
 		switchToThisAreaAndLoadIfNecessary(image, image.areaIdxUsed-1)
-	}
-	
-	if (absoluteScale > 1.5 && image.areaIdxUsed+1 < availableImageSizesByArea.length) {
+	if (absoluteScale > 1.5 && image.areaIdxUsed+1 < availableImageSizesByArea.length)
 		switchToThisAreaAndLoadIfNecessary(image, image.areaIdxUsed+1)
-	}
 }
 
 function switchToThisAreaAndLoadIfNecessary(image, areaToSetTo) {
@@ -264,7 +247,7 @@ function updateScreenElemsSize() {
 }
 
 
-function zoom(e) {
+function wheelMove(e) {
 	e.preventDefault()
 	var wheelMovement = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)))
 	// altKey, ctrlKey, shiftKey
@@ -273,15 +256,22 @@ function zoom(e) {
 		// Firefox: shift + mouseWheel down => go back in history ...
 		powerSimilarity += wheelMovement*0.05
 	} else {
-		powerSimilarity += wheelMovement*0.05
-		powerScale += wheelMovement*0.15
-		
-		powerScale = Math.max(-1.5, Math.min(powerScale, 6.5))
-		
-		console.log(powerScale)
+		zoom(wheelMovement)
 	}
 	updateImages()
 }
+
+
+function zoom(sign) {
+	if ((sign > 0 && powerScale < 7) || (sign < 0 && powerScale > 0.1)) {
+		powerSimilarity += sign*0.05
+		powerScale += sign*0.15
+		rStart += sign*0.01
+		rEnd += sign*0.02
+	}
+	updateImages()
+}
+
 
 function loadAllImages(callback) {
 	// image loading is not synchronous in PIXI.Texture and PIXI.Sprite.
@@ -319,14 +309,25 @@ function initImage(image) {
 	//sprite.buttonMode = true
 	
 	sprite.on("mousedown", function(e) {
-		updateImages(image)
+		if (image === centeredImage) {
+			console.log(e.data.originalEvent)
+			if (e.data.originalEvent.buttons === 1)
+				zoom(1)
+			if (e.data.originalEvent.buttons === 2)
+				zoom(-1)
+		} else {
+			updateImages(image)
+		}
 	})
 	sprite.on("mouseover", function(e) {
 		var that = this
 		lastMouseOverSprite = this
 		setTimeout(function() {
-			if (that === lastMouseOverSprite)
+			if (that === lastMouseOverSprite) {
 				moveToFront(that)
+				if (that !== centeredImage.sprite)
+					moveToBack(centeredImage.sprite)
+			}
 		}, 300 /*ms*/)
 	})
 	
@@ -355,6 +356,12 @@ function moveToFront(sprite) {
 	// move to front
 	stage.removeChild(sprite)
 	stage.addChild(sprite)
+}
+
+function moveToBack(sprite) {
+	stage.setChildIndex(sprite, 0)
+	// stage.removeChild(sprite)
+	// stage.addChild(sprite)
 }
 
 function updateImages(newCenter = centeredImage) {
