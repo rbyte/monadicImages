@@ -41,6 +41,7 @@ function run(runCallback = () => {}, numThreads = 4) {
 				}
 				var e = queue[msg.position]
 				e.done = true
+				e.callback(msg.error, msg.stdout, msg.stderr)
 				
 				if (queue.every(e => e.done)) {
 					queue = []
@@ -48,14 +49,12 @@ function run(runCallback = () => {}, numThreads = 4) {
 					threads = []
 					runCallback()
 				}
-				// at the end, in case that takes a long time
-				e.callback(msg.error, msg.stdout, msg.stderr)
 			}
 		})
 		
 		// number of items that any one thread is working on at once
 		scheduleNextInLine(thread)
-		scheduleNextInLine(thread)
+		// scheduleNextInLine(thread)
 	})
 }
 

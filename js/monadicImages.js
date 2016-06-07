@@ -1,10 +1,8 @@
-//var d3 = require("d3")
-//var PIXI = require("pixi.js")
 
 const τ = Math.PI*2
 const availableImageSizesByArea = [1000, 10000, 100000, 1000000]
 const availableImageSizesByAreaToPreload = [true, false, false, false]
-const jsons = ["images/vangogh.json"]
+const jsons = ["images/images.json"]
 const distortCircleIntoCanvasRectangle = true
 
 var canvasContainer
@@ -44,7 +42,7 @@ function init() {
 		images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
 		
 		// VAN GOGH ONLY
-		images = prepareVanGoghImages(images)
+		// images = prepareVanGoghImages(images)
 		
 		// low value should be low similarity
 		images.forEach(e => e.similarity = e.similarity.map(x => 1-x))
@@ -68,6 +66,9 @@ function init() {
 		canvasContainer = document.getElementById("canvasContainer")
 		pixiRenderer = new PIXI.WebGLRenderer(w, h, {transparent: true})
 		canvasContainer.appendChild(pixiRenderer.view)
+		pixiRenderer.view.oncontextmenu = function (e) {
+			e.preventDefault()
+		}
 		stage = new PIXI.Container()
 		centeredImage = images[0]
 		
@@ -116,6 +117,7 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 		var xhr = new XMLHttpRequest()
 		xhr.open("GET", e)
 		xhr.onload = function() {
+			console.log(xhr.responseText)
 			result[i] = JSON.parse(xhr.responseText)
 			if (result.every(e => e))
 				callback(result)
@@ -313,6 +315,7 @@ function initImage(image) {
 			console.log(e.data.originalEvent)
 			if (e.data.originalEvent.buttons === 1)
 				zoom(1)
+			// TODO mousedown does not trigger on right clicks ... dont know why
 			if (e.data.originalEvent.buttons === 2)
 				zoom(-1)
 		} else {
