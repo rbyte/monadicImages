@@ -117,7 +117,6 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 		var xhr = new XMLHttpRequest()
 		xhr.open("GET", e)
 		xhr.onload = function() {
-			console.log(xhr.responseText)
 			result[i] = JSON.parse(xhr.responseText)
 			if (result.every(e => e))
 				callback(result)

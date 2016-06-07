@@ -1,2 +1,2 @@
 <?php
-exec('node preprocess.js >> preprocess.log');
+exec('node preprocess.js > preprocess.log');
