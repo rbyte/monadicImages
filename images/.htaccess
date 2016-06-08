@@ -1,0 +1,6 @@
+<FilesMatch "\.(sh|js|html|php)$"> 
+	AuthName "Member Only"
+	AuthType Basic
+	AuthUserFile .htpasswd
+	require valid-user
+</FilesMatch>

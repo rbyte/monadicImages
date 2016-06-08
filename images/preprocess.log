@@ -1,4 +1,12 @@
-[]
+[ { file: '1003.jpg' },
+  { file: '1004.jpg' },
+  { file: '1005.jpg' },
+  { file: '1006.jpg' },
+  { file: '1007.jpg' } ]
 done resizing
+thread created.
+thread created.
+thread created.
+thread created.
 thread run done
 all done

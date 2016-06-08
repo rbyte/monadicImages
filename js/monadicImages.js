@@ -1,29 +1,92 @@
+/*
+ *	Matthias Graf
+ *	matthias.graf@mgrf.de
+ *	2016
+ *	GNU AGPL v3
+ */
 
 const τ = Math.PI*2
 const availableImageSizesByArea = [1000, 10000, 100000, 1000000]
 const availableImageSizesByAreaToPreload = [true, false, false, false]
 const jsons = ["images/images.json"]
 const distortCircleIntoCanvasRectangle = true
+const titelKeilAngle = τ*0.1 // 360° * 10%
+// alpha = 0 is EAST. start with:
+var currentAlpha = τ*0.5+titelKeilAngle*0.5
 
 var canvasContainer
 var pixiRenderer
 var stage
-var transition = false
 
-// relative values
-var w = 1500, h = 800
-var rStart = 0.1
+var w = 1500
+var h = 800
+
+var rStart = 0.19
 var rEnd = 1.00
-// the center of mass needs to remain ~1!
 var scaleStart = 0.7
 var scaleEnd = 1.8
 var powerSimilarity = 1
 var powerScale = 0.5
-var titelKeilAngle = τ*0.1 // 360° * 10%
-// alpha = 0 is EAST
-var initalAlpha = τ*0.5+titelKeilAngle*0.5
+
+var rStartGrowth = 0.02
+var rEndGrowth = 0.02
+var scaleStartGrowth = 0
+var scaleEndGrowth = 0
+var powerSimilarityGrowth = 0.075
+var powerScaleGrowth = 0.15
+
+
+var min = {
+	rStart: 0.05,
+	rEnd: 0.8,
+	scaleStart: 0.1,
+	scaleEnd: 1.0,
+	powerSimilarity: 0,
+	powerScale: 0,
+	
+	rStartGrowth: -0.1,
+	rEndGrowth: -0.1,
+	scaleStartGrowth: -0.1,
+	scaleEndGrowth: -0.1,
+	powerSimilarityGrowth: -0.1,
+	powerScaleGrowth: -0.1,
+}
+
+var max = {
+	rStart: 0.55,
+	rEnd: 2.5,
+	scaleStart: 1.0,
+	scaleEnd: 2.8,
+	powerSimilarity: 15,
+	powerScale: 7,
+	
+	rStartGrowth: 0.2,
+	rEndGrowth: 0.2,
+	scaleStartGrowth: 0.2,
+	scaleEndGrowth: 0.2,
+	powerSimilarityGrowth: 0.2,
+	powerScaleGrowth: 0.2,
+}
+
+var step = {
+	rStart: 0.05,
+	rEnd: 0.05,
+	scaleStart: 0.05,
+	scaleEnd: 0.05,
+	powerSimilarity: 0.05,
+	powerScale: 0.05,
+	
+	rStartGrowth: 0.005,
+	rEndGrowth: 0.005,
+	scaleStartGrowth: 0.005,
+	scaleEndGrowth: 0.005,
+	powerSimilarityGrowth: 0.005,
+	powerScaleGrowth: 0.005,
+}
+
 
 var lastMouseOverSprite
+var transition = false
 
 var images
 var centeredImage
@@ -47,6 +110,14 @@ function init() {
 		// low value should be low similarity
 		images.forEach(e => e.similarity = e.similarity.map(x => 1-x))
 		
+		equaliseSimilarity()
+		// var flatSim = [].concat(...images.map(e => e.similarity))
+		// createHistogram(flatSim)
+		
+		// if (true) {
+		// 	return
+		// }
+		
 		images.sort((a,b) => {
 			// compare by date, fall back to compare by name if no date available
 			if (!a.date || !b.date)
@@ -55,7 +126,6 @@ function init() {
 		})
 		
 		//var flatSim = [].concat(...images.map(e => e.similarity))
-		//createHistogram(flatSim)
 		
 		// firefox: about:config: layers.acceleration.draw-fps
 		// ~40 fps with 2260 images
@@ -63,6 +133,7 @@ function init() {
 		// reduce number of rendered images
 		
 		//images = images.slice(0, 500)
+		
 		canvasContainer = document.getElementById("canvasContainer")
 		pixiRenderer = new PIXI.WebGLRenderer(w, h, {transparent: true})
 		canvasContainer.appendChild(pixiRenderer.view)
@@ -85,10 +156,18 @@ function init() {
 			// Firefox
 			canvasContainer.addEventListener("DOMMouseScroll", wheelMove, false)
 			
-			initSlider("scaleStart")
-			initSlider("scaleEnd")
 			initSlider("rStart")
+			initSlider("rStartGrowth")
 			initSlider("rEnd")
+			initSlider("rEndGrowth")
+			initSlider("scaleStart")
+			initSlider("scaleStartGrowth")
+			initSlider("scaleEnd")
+			initSlider("scaleEndGrowth")
+			initSlider("powerSimilarity")
+			initSlider("powerSimilarityGrowth")
+			initSlider("powerScale")
+			initSlider("powerScaleGrowth")
 		})
 		
 	})
@@ -96,17 +175,54 @@ function init() {
 
 function initSlider(s) {
 	// is a top level variable
-	console.assert(window[s])
-	var slider = document.querySelector("#"+s)
+	console.assert(window[s] !== undefined)
+	
+	var ul = document.getElementById("controls")
+	var li = ul.appendChild(document.createElement("li"))
+	var slider = li.appendChild(document.createElement("input"))
+	var label = li.appendChild(document.createElement("label"))
+	label.setAttribute("for", s)
+	slider.setAttribute("id", s)
+	slider.setAttribute("type", "range")
+	slider.setAttribute("min", min[s])
+	slider.setAttribute("max", max[s])
+	slider.setAttribute("step", step[s])
 	slider.value = window[s]
-	var label = document.querySelector("label[for="+s+"")
-	var setLabel = () => label.innerHTML = s+" "+window[s].toFixed(2)
-	setLabel()
+	slider.setLabel = () => label.innerHTML = s+" "+window[s].toFixed(2)
+	slider.setLabel()
 	slider.oninput = function(e) {
 		window[s] = Number(this.value)
-		setLabel()
+		slider.setLabel()
 		updateImages()
 	}
+}
+
+function updateSlider(s) {
+	var slider = document.querySelector("#"+s)
+	slider.value = window[s]
+	slider.setLabel()
+}
+
+function equaliseSimilarity() {
+	var flatSim = [].concat(...images.map(e => e.similarity))
+	// createHistogram(flatSim)
+	
+	const buckets = 500
+	var uniqueSorted = new Array(buckets).fill(1).map((e,i) => (i+1)/buckets)
+	// accumulated histogram
+	var accu = uniqueSorted.map(e => flatSim.filter(x => x<=e).length)
+	console.assert(accu[accu.length-1] === flatSim.length)
+	// into [0,1]
+	var normalised = accu.map(e => e/flatSim.length)
+	
+	var bucketIndex = function(e) {
+		var bucket = 0
+		while (e > uniqueSorted[bucket])
+			bucket++
+		return bucket
+	}
+	
+	images.forEach(e => e.similarity = e.similarity.map(e => normalised[bucketIndex(e)]))
 }
 
 // synchronise xhr onload for all files
@@ -264,11 +380,20 @@ function wheelMove(e) {
 
 
 function zoom(sign) {
-	if ((sign > 0 && powerScale < 7) || (sign < 0 && powerScale > 0.1)) {
-		powerSimilarity += sign*0.05
-		powerScale += sign*0.15
-		rStart += sign*0.01
-		rEnd += sign*0.02
+	if ((sign > 0 && powerScale < max.powerScale) || (sign < 0 && powerScale > min.powerScale)) {
+		rStart += sign * rStartGrowth
+		rEnd += sign * rEndGrowth
+		scaleStart += sign * scaleStartGrowth
+		scaleEnd += sign * scaleEndGrowth
+		powerSimilarity += sign * powerSimilarityGrowth
+		powerScale += sign * powerScaleGrowth
+		
+		updateSlider("rStart")
+		updateSlider("rEnd")
+		updateSlider("scaleStart")
+		updateSlider("scaleEnd")
+		updateSlider("powerSimilarity")
+		updateSlider("powerScale")
 	}
 	updateImages()
 }
@@ -302,8 +427,8 @@ function initImage(image) {
 	console.assert(sprite)
 	image.sprite = sprite
 	
-	image.alpha = initalAlpha
-	initalAlpha += 1/images.length*(τ-titelKeilAngle)
+	image.alpha = currentAlpha
+	currentAlpha += 1/images.length*(τ-titelKeilAngle)
 	
 	sprite.interactive = true
 	// turns pointer to hand on mouseover

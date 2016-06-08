@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+	<meta charset="UTF-8">
+	<title>Monadic Images Configuration</title>
+	<style>
+		ol li {
+			padding-bottom: 0.3em;
+		}
+		button {
+			height: 2em;
+			margin-right: 1em;
+		}
+	</style>
+</head>
+<body>
+
+<h2>Set up new images.</h2>
+
+<ol>
+	<li id="removeOldLi"><button onclick="removeOld()">Remove old images</button></li>
+	<li><a href="upload/">Upload new images here</a></li>
+	<li id="processLi"><button onclick="processNewImages()">Process (may take hours)</button></li>
+</ol>
+
+<script>
+	function XHR(file, callback) {
+		var xhr = new XMLHttpRequest()
+		xhr.addEventListener("load", callback)
+		xhr.open("GET", file)
+		xhr.send()
+	}
+	
+	function onButton(liId, file) {
+		var li = document.querySelector("#"+liId)
+		var button = document.querySelector("#"+liId+" button")
+		var progress = li.appendChild(document.createElement("progress"))
+		button.disabled = true
+		XHR(file, function(xhr) {
+			console.log(xhr)
+			progress.setAttribute("max", "1")
+			progress.setAttribute("value", "1")
+			button.disabled = false
+		})
+	}
+	
+	
+	function removeOld() {
+		onButton("removeOldLi", "clearAllRun.php")
+	}
+	
+	function processNewImages() {
+		onButton("processLi", "preprocessRun.php")
+	}
+</script>
+
+</body>
+</html>

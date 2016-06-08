@@ -29,13 +29,36 @@ body {
 	color: grey;
 	font-size: 300%;
 }
-label {
-	color: grey;
-}
 #controls {
 	position: fixed;
 	top: 2%;
 	right: 2%;
-	color: grey;
+	color: white;
+	text-shadow: 1px 1px 2px black;
 	font-size: 100%;
+	background-color: transparent;
+	border-radius: 5px;
+	padding: 5px;
+	list-style-type: none;
+}
+#controls li {
+	display: none;
+}
+#controls li:first-child {
+	display: block;
+	text-align: right;
+}
+#controls li:first-child img {
+	height: 25px;
+	opacity: 0.2;
+}
+#controls:hover {
+	background-color: rgba(255, 255, 255, 0.2);
+}
+#controls:hover li {
+	display: block;
+}
+#controls a {
+	color: #d3e1f0;
+	text-align: center;
 }
