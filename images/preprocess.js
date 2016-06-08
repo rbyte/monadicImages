@@ -69,6 +69,7 @@ threadPool.run(() => {
 	
 	threadPool.run(function() {
 		console.log("thread run done")
+		// just in case an error happens after this ...
 		fs.writeFileSync("images.json", JSON.stringify(images))
 		console.assert(images.map(e => e.similarity.every(x => typeof x === "number" && !isNaN(x))).every(x => x))
 		

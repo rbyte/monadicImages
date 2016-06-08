@@ -17,73 +17,41 @@ var currentAlpha = τ*0.5+titelKeilAngle*0.5
 var canvasContainer
 var pixiRenderer
 var stage
+var infoBox
 
 var w = 1500
 var h = 800
 
-var rStart = 0.19
-var rEnd = 1.00
-var scaleStart = 0.7
-var scaleEnd = 1.8
-var powerSimilarity = 1
-var powerScale = 0.5
-
-var rStartGrowth = 0.02
-var rEndGrowth = 0.02
-var scaleStartGrowth = 0
-var scaleEndGrowth = 0
-var powerSimilarityGrowth = 0.075
-var powerScaleGrowth = 0.15
-
-
-var min = {
-	rStart: 0.05,
-	rEnd: 0.8,
-	scaleStart: 0.1,
-	scaleEnd: 1.0,
-	powerSimilarity: 0,
-	powerScale: 0,
+var variables = {
+	// [value, min, max, step]
+	rStart: [0.19, 0.05, 0.55, 0.05],
+	rEnd: [1.00, 0.8, 2.5, 0.05],
+	scaleStart: [0.7, 0.1, 1.0, 0.05],
+	scaleEnd: [1.8, 1.0, 2.8, 0.05],
+	powerSimilarity: [1, 0, 15, 0.05],
+	powerScale: [0.5, 0, 7, 0.05],
 	
-	rStartGrowth: -0.1,
-	rEndGrowth: -0.1,
-	scaleStartGrowth: -0.1,
-	scaleEndGrowth: -0.1,
-	powerSimilarityGrowth: -0.1,
-	powerScaleGrowth: -0.1,
+	rStartGrowth: [0.02, -0.1, 0.2, 0.005],
+	rEndGrowth: [0.02, -0.1, 0.2, 0.005],
+	scaleStartGrowth: [0, -0.1, 0.2, 0.005],
+	scaleEndGrowth: [0, -0.1, 0.2, 0.005],
+	powerSimilarityGrowth: [0.075, -0.1, 0.2, 0.005],
+	powerScaleGrowth: [0.15, -0.1, 0.2, 0.005],
 }
 
-var max = {
-	rStart: 0.55,
-	rEnd: 2.5,
-	scaleStart: 1.0,
-	scaleEnd: 2.8,
-	powerSimilarity: 15,
-	powerScale: 7,
-	
-	rStartGrowth: 0.2,
-	rEndGrowth: 0.2,
-	scaleStartGrowth: 0.2,
-	scaleEndGrowth: 0.2,
-	powerSimilarityGrowth: 0.2,
-	powerScaleGrowth: 0.2,
+var min = {}
+var max = {}
+var step = {}
+// unpack
+for (let varr in variables) {
+	let [value, _min, _max, _step] = variables[varr]
+	window[varr] = value
+	min[varr] = _min
+	max[varr] = _max
+	step[varr] = _step
+	// invalidate
+	variables[varr] = null
 }
-
-var step = {
-	rStart: 0.05,
-	rEnd: 0.05,
-	scaleStart: 0.05,
-	scaleEnd: 0.05,
-	powerSimilarity: 0.05,
-	powerScale: 0.05,
-	
-	rStartGrowth: 0.005,
-	rEndGrowth: 0.005,
-	scaleStartGrowth: 0.005,
-	scaleEndGrowth: 0.005,
-	powerSimilarityGrowth: 0.005,
-	powerScaleGrowth: 0.005,
-}
-
 
 var lastMouseOverSprite
 var transition = false
@@ -111,12 +79,6 @@ function init() {
 		images.forEach(e => e.similarity = e.similarity.map(x => 1-x))
 		
 		equaliseSimilarity()
-		// var flatSim = [].concat(...images.map(e => e.similarity))
-		// createHistogram(flatSim)
-		
-		// if (true) {
-		// 	return
-		// }
 		
 		images.sort((a,b) => {
 			// compare by date, fall back to compare by name if no date available
@@ -125,15 +87,10 @@ function init() {
 			return a.date < b.date ? -1 : 1
 		})
 		
-		//var flatSim = [].concat(...images.map(e => e.similarity))
-		
 		// firefox: about:config: layers.acceleration.draw-fps
-		// ~40 fps with 2260 images
-		// ~10 fps with 22600 images
-		// reduce number of rendered images
-		
 		//images = images.slice(0, 500)
 		
+		infoBox = document.querySelector("#detailedInfo")
 		canvasContainer = document.getElementById("canvasContainer")
 		pixiRenderer = new PIXI.WebGLRenderer(w, h, {transparent: true})
 		canvasContainer.appendChild(pixiRenderer.view)
@@ -156,18 +113,8 @@ function init() {
 			// Firefox
 			canvasContainer.addEventListener("DOMMouseScroll", wheelMove, false)
 			
-			initSlider("rStart")
-			initSlider("rStartGrowth")
-			initSlider("rEnd")
-			initSlider("rEndGrowth")
-			initSlider("scaleStart")
-			initSlider("scaleStartGrowth")
-			initSlider("scaleEnd")
-			initSlider("scaleEndGrowth")
-			initSlider("powerSimilarity")
-			initSlider("powerSimilarityGrowth")
-			initSlider("powerScale")
-			initSlider("powerScaleGrowth")
+			for (let varr in variables)
+				initSlider(varr)
 		})
 		
 	})
@@ -203,12 +150,14 @@ function updateSlider(s) {
 	slider.setLabel()
 }
 
+// assumes values are in [0,1]
 function equaliseSimilarity() {
 	var flatSim = [].concat(...images.map(e => e.similarity))
 	// createHistogram(flatSim)
 	
 	const buckets = 500
 	var uniqueSorted = new Array(buckets).fill(1).map((e,i) => (i+1)/buckets)
+	// https://martin-thoma.com/calculate-histogram-equalization/
 	// accumulated histogram
 	var accu = uniqueSorted.map(e => flatSim.filter(x => x<=e).length)
 	console.assert(accu[accu.length-1] === flatSim.length)
@@ -241,6 +190,7 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 	})
 }
 
+// TODO obsolete
 function prepareVanGoghImages(images) {
 	images.forEach(e => e.date = new Date(e.yearDrawn,1,1,1,1,1,1))
 	// VANGOGH images width & height !== image resolution, nor proportional
@@ -274,15 +224,15 @@ function positionImage(w, h, image) {
 	var alpha, r, scale
 	
 	if (transition) {
-		var dt = Date.now() - transition.start
-		var progress = dt / transition.durationMS
+		let dt = Date.now() - transition.start
+		let progress = dt / transition.durationMS
 		if (progress > 1) {
 			progress = 1
 			transition = false
 		}
 		
-		var start = image.transitionStart
-		var end = image
+		let start = image.transitionStart
+		let end = image
 		
 		alpha = linearInterpolation(start.alpha, progress, end.alpha)
 		r = linearInterpolation(start.r, progress, end.r)
@@ -297,12 +247,10 @@ function positionImage(w, h, image) {
 		: powerScale+1 // power: will spread scales
 	
 	if (r < rStart) {
-		var rampFrom0up = 1 - r/rStart
-		// https://rechneronline.de/funktionsgraphen/
+		let rampFrom0up = 1 - r/rStart
 		// decreases size of center image by suppressing the growth of the exponent
-		var centerFn = x => 0.8/(x-0.6)
+		let centerFn = x => 0.8/(x-0.6)
 		scale *= 1 + centerFn(exponent) * rampFrom0up
-		// console.log(scale, exponent, centerFn(exponent), absoluteScale)
 	}
 	
 	// has scale=1 as center
@@ -436,7 +384,6 @@ function initImage(image) {
 	
 	sprite.on("mousedown", function(e) {
 		if (image === centeredImage) {
-			console.log(e.data.originalEvent)
 			if (e.data.originalEvent.buttons === 1)
 				zoom(1)
 			// TODO mousedown does not trigger on right clicks ... dont know why
@@ -494,7 +441,6 @@ function moveToBack(sprite) {
 function updateImages(newCenter = centeredImage) {
 	centeredImage = newCenter
 	
-	var infoBox = document.querySelector("#detailedInfo")
 	while (infoBox.firstChild) {
 		infoBox.removeChild(infoBox.firstChild)
 	}
@@ -502,11 +448,8 @@ function updateImages(newCenter = centeredImage) {
 		var li = infoBox.appendChild(document.createElement("li"))
 		li.appendChild(document.createTextNode(string))
 	}
-	addPoint(centeredImage.description)
-	addPoint(centeredImage.yearDrawn)
-	addPoint(centeredImage.keywords)
-	addPoint(centeredImage.material)
-	
+	// TODO display image metadata
+	// addPoint(centeredImage.metadata...)
 	
 	startTransition()
 	images.forEach(img => {
@@ -517,7 +460,6 @@ function updateImages(newCenter = centeredImage) {
 		img.scale = linearInterpolation(scaleStart, similarity, scaleEnd)
 	})
 	centeredImage.r = 0
-	//centeredImage.scale = centerImageScale
 	moveToFront(centeredImage.sprite)
 }
 
@@ -580,8 +522,6 @@ function createHistogram(values = d3.range(1000).map(d3.random.bates(10))) {
 		.attr("transform", "translate(0," + height + ")")
 		.call(xAxis);
 }
-
-
 
 
 init()
