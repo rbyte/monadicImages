@@ -4,7 +4,6 @@
 	<meta charset="UTF-8">
 	<title>Monadic Images</title>
 	<link rel="stylesheet" type="text/css" href="css/main.css"/>
-	<script src="js/d3.js"></script>
 	<script src="js/pixi.js"></script>
 	<script src="js/monadicImages.js" defer></script>
 </head>
@@ -16,6 +15,11 @@
 <ul id="controls">
 	<li><img src="css/gear.svg"></li>
 	<li><a href="images/config.html">Set up new images.</a></li>
+	<li>
+		<button onclick="saveParameters()">Save</button>
+		<button onclick="resetParameters()">Reset</button>
+		<button onclick="exportParameters()">Export</button>
+	</li>
 </ul>
 
 </body>

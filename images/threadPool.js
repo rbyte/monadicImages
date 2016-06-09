@@ -54,7 +54,7 @@ function run(runCallback = () => {}, numThreads = 4) {
 		
 		// number of items that any one thread is working on at once
 		scheduleNextInLine(thread)
-		// scheduleNextInLine(thread)
+		scheduleNextInLine(thread)
 	})
 }
 

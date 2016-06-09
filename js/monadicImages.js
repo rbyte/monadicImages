@@ -8,11 +8,11 @@
 const τ = Math.PI*2
 const availableImageSizesByArea = [1000, 10000, 100000, 1000000]
 const availableImageSizesByAreaToPreload = [true, false, false, false]
-const jsons = ["images/images.json"]
+const jsons = ["images/images.json", "images/customParameters.json"]
 const distortCircleIntoCanvasRectangle = true
-const titelKeilAngle = τ*0.1 // 360° * 10%
+const wedgeAngle = τ*0.1 // 360° * 10%
 // alpha = 0 is EAST. start with:
-var currentAlpha = τ*0.5+titelKeilAngle*0.5
+var currentAlpha = τ*0.5+wedgeAngle*0.5
 
 var canvasContainer
 var pixiRenderer
@@ -22,35 +22,24 @@ var infoBox
 var w = 1500
 var h = 800
 
-var variables = {
-	// [value, min, max, step]
-	rStart: [0.19, 0.05, 0.55, 0.05],
-	rEnd: [1.00, 0.8, 2.5, 0.05],
-	scaleStart: [0.7, 0.1, 1.0, 0.05],
-	scaleEnd: [1.8, 1.0, 2.8, 0.05],
-	powerSimilarity: [1, 0, 15, 0.05],
-	powerScale: [0.5, 0, 7, 0.05],
+var min = {}, max = {}, step = {}, description = {}
+// values can be overwritten via customParameters.json & localStorage
+var parameters = {
+	// [value, min, max, step, description]
+	rStart: [0.19, 0.05, 0.55, 0.05, "Inner Radius"],
+	rEnd: [1.00, 0.8, 2.5, 0.05, "Outer Radius"],
+	scaleStart: [0.7, 0.1, 1.0, 0.05, "Smallest Size"],
+	scaleEnd: [1.4, 1.0, 2.8, 0.05, "Largest Size"],
+	powerSimilarity: [1.5, 0, 15, 0.05, "Distribution"],
+	powerScale: [0.5, 0, 7, 0.05, "Size Spreading"],
+	centerImageScaleExponentIncrease: [0.5, 0, 4, 0.1, "Center Image Size"],
 	
-	rStartGrowth: [0.02, -0.1, 0.2, 0.005],
-	rEndGrowth: [0.02, -0.1, 0.2, 0.005],
-	scaleStartGrowth: [0, -0.1, 0.2, 0.005],
-	scaleEndGrowth: [0, -0.1, 0.2, 0.005],
-	powerSimilarityGrowth: [0.075, -0.1, 0.2, 0.005],
-	powerScaleGrowth: [0.15, -0.1, 0.2, 0.005],
-}
-
-var min = {}
-var max = {}
-var step = {}
-// unpack
-for (let varr in variables) {
-	let [value, _min, _max, _step] = variables[varr]
-	window[varr] = value
-	min[varr] = _min
-	max[varr] = _max
-	step[varr] = _step
-	// invalidate
-	variables[varr] = null
+	rStartGrowth: [0.02, 0, 0.1, 0.005, "Inner Radius Growth"],
+	rEndGrowth: [0.02, 0, 0.1, 0.005, "Outer Radius Growth"],
+	scaleStartGrowth: [0, 0, 0.1, 0.005, "Smallest Size Growth"],
+	scaleEndGrowth: [0, 0, 0.1, 0.005, "Largest Size Growth"],
+	powerSimilarityGrowth: [0.075, 0, 0.2, 0.005, "Distribution Growth"],
+	powerScaleGrowth: [0.15, 0, 0.2, 0.005, "Size Distribution Growth"],
 }
 
 var lastMouseOverSprite
@@ -60,7 +49,23 @@ var images
 var centeredImage
 
 function init() {
-	withLoadedJSONfiles(jsons, function([imgs]) {
+	withLoadedJSONfiles(jsons, function([imgs, customParameters]) {
+		// unpack
+		for (let varr in parameters) {
+			let [value, _min, _max, _step, _description] = parameters[varr]
+			window[varr] = value
+			if (customParameters[varr])
+				window[varr] = customParameters[varr]
+			if (localStorage && localStorage.getItem(varr))
+				window[varr] = Number(localStorage.getItem(varr))
+			console.assert(!isNaN(window[varr]))
+			min[varr] = _min
+			max[varr] = _max
+			step[varr] = _step
+			description[varr] = _description
+			// parameters[varr] is kept to refer back to defaults
+		}
+		
 		images = imgs
 		// retain indices for later referencing (after sort reordered array)
 		// important for similarity indices
@@ -70,25 +75,14 @@ function init() {
 		images.forEach(e => e.getPath = function(areaIdx = this.areaIdxUsed) {
 			return "images/area"+availableImageSizesByArea[areaIdx]+"/"+this.file
 		})
-		images.forEach(e => e.date = e.date ? undefined : new Date(e.date))
-		
-		// VAN GOGH ONLY
-		// images = prepareVanGoghImages(images)
-		
-		// low value should be low similarity
-		images.forEach(e => e.similarity = e.similarity.map(x => 1-x))
-		
-		equaliseSimilarity()
+		images.forEach(e => e.meta.date = e.meta.date ? new Date(e.meta.date) : undefined)
 		
 		images.sort((a,b) => {
 			// compare by date, fall back to compare by name if no date available
-			if (!a.date || !b.date)
+			if (!a.meta.date || !b.meta.date)
 				return a.file < b.file ? -1 : 1
-			return a.date < b.date ? -1 : 1
+			return a.meta.date < b.meta.date ? -1 : 1
 		})
-		
-		// firefox: about:config: layers.acceleration.draw-fps
-		//images = images.slice(0, 500)
 		
 		infoBox = document.querySelector("#detailedInfo")
 		canvasContainer = document.getElementById("canvasContainer")
@@ -113,32 +107,29 @@ function init() {
 			// Firefox
 			canvasContainer.addEventListener("DOMMouseScroll", wheelMove, false)
 			
-			for (let varr in variables)
+			for (let varr in parameters)
 				initSlider(varr)
 		})
 		
 	})
 }
 
-function initSlider(s) {
-	// is a top level variable
-	console.assert(window[s] !== undefined)
-	
+function initSlider(varr) {
 	var ul = document.getElementById("controls")
 	var li = ul.appendChild(document.createElement("li"))
 	var slider = li.appendChild(document.createElement("input"))
 	var label = li.appendChild(document.createElement("label"))
-	label.setAttribute("for", s)
-	slider.setAttribute("id", s)
+	label.setAttribute("for", varr)
+	slider.setAttribute("id", varr)
 	slider.setAttribute("type", "range")
-	slider.setAttribute("min", min[s])
-	slider.setAttribute("max", max[s])
-	slider.setAttribute("step", step[s])
-	slider.value = window[s]
-	slider.setLabel = () => label.innerHTML = s+" "+window[s].toFixed(2)
+	slider.setAttribute("min", min[varr])
+	slider.setAttribute("max", max[varr])
+	slider.setAttribute("step", step[varr])
+	slider.value = window[varr]
+	slider.setLabel = () => label.innerHTML = window[varr].toFixed(2)+" "+description[varr]
 	slider.setLabel()
 	slider.oninput = function(e) {
-		window[s] = Number(this.value)
+		window[varr] = Number(this.value)
 		slider.setLabel()
 		updateImages()
 	}
@@ -150,28 +141,28 @@ function updateSlider(s) {
 	slider.setLabel()
 }
 
-// assumes values are in [0,1]
-function equaliseSimilarity() {
-	var flatSim = [].concat(...images.map(e => e.similarity))
-	// createHistogram(flatSim)
-	
-	const buckets = 500
-	var uniqueSorted = new Array(buckets).fill(1).map((e,i) => (i+1)/buckets)
-	// https://martin-thoma.com/calculate-histogram-equalization/
-	// accumulated histogram
-	var accu = uniqueSorted.map(e => flatSim.filter(x => x<=e).length)
-	console.assert(accu[accu.length-1] === flatSim.length)
-	// into [0,1]
-	var normalised = accu.map(e => e/flatSim.length)
-	
-	var bucketIndex = function(e) {
-		var bucket = 0
-		while (e > uniqueSorted[bucket])
-			bucket++
-		return bucket
+function saveParameters() {
+	if (localStorage)
+		for (let varr in parameters)
+			localStorage.setItem(varr, window[varr])
+}
+
+function resetParameters() {
+	if (localStorage)
+		localStorage.clear()
+	for (let varr in parameters) {
+		let [defaultValue, , , ] = parameters[varr]
+		window[varr] = defaultValue
+		updateSlider(varr)
 	}
-	
-	images.forEach(e => e.similarity = e.similarity.map(e => normalised[bucketIndex(e)]))
+	updateImages()
+}
+
+function exportParameters() {
+	var dl = {}
+	for (let varr in parameters)
+		dl[varr] = window[varr]
+	window.open("data:application/json," + encodeURIComponent(JSON.stringify(dl)), "customParameters.json")
 }
 
 // synchronise xhr onload for all files
@@ -188,26 +179,6 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 		}
 		xhr.send()
 	})
-}
-
-// TODO obsolete
-function prepareVanGoghImages(images) {
-	images.forEach(e => e.date = new Date(e.yearDrawn,1,1,1,1,1,1))
-	// VANGOGH images width & height !== image resolution, nor proportional
-	// to avoid ambiguity
-	images.forEach(e => {
-		e.physicalHeight = e.height
-		delete e.height
-		e.physicalWidth = e.width
-		delete e.width
-	})
-	
-	// similarity histogram equalization (specific to VANGOGH)
-	images.forEach(e => e.similarity = e.similarity.map(x => Math.pow(x, 0.25)))
-	
-	var spreadCenterToCorners = x => Math.atan((x-0.5)*6)/2.5+0.5 // [0,1] => [0,1]
-	images.forEach(e => e.similarity = e.similarity.map(x => spreadCenterToCorners(x)))
-	return images
 }
 
 function polarCoordinates(w, h, alpha, r) {
@@ -246,14 +217,13 @@ function positionImage(w, h, image) {
 		? 1/(Math.abs(powerScale)+1) // root: will conform scales
 		: powerScale+1 // power: will spread scales
 	
+	// treat center image
 	if (r < rStart) {
 		let rampFrom0up = 1 - r/rStart
-		// decreases size of center image by suppressing the growth of the exponent
-		let centerFn = x => 0.8/(x-0.6)
-		scale *= 1 + centerFn(exponent) * rampFrom0up
+		exponent += centerImageScaleExponentIncrease * rampFrom0up
 	}
 	
-	// has scale=1 as center
+	// scale is roughly distributed around 1
 	var poweredScale = Math.pow(scale, exponent)
 	var circleDiameterPX = Math.min(w,h)
 	var absoluteScale = poweredScale / Math.sqrt(availableImageSizesByArea[image.areaIdxUsed]) / Math.sqrt(images.length) * circleDiameterPX
@@ -311,7 +281,6 @@ function updateScreenElemsSize() {
 	pixiRenderer.resize(w, h)
 }
 
-
 function wheelMove(e) {
 	e.preventDefault()
 	var wheelMovement = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)))
@@ -326,26 +295,23 @@ function wheelMove(e) {
 	updateImages()
 }
 
-
 function zoom(sign) {
-	if ((sign > 0 && powerScale < max.powerScale) || (sign < 0 && powerScale > min.powerScale)) {
-		rStart += sign * rStartGrowth
-		rEnd += sign * rEndGrowth
-		scaleStart += sign * scaleStartGrowth
-		scaleEnd += sign * scaleEndGrowth
+	if ((sign > 0 && powerScale < max.powerScale) || (sign < 0 && min.powerScale < powerScale)) {
+		rStart          += sign * rStartGrowth
+		rEnd            += sign * rEndGrowth
+		scaleStart      += sign * scaleStartGrowth
+		scaleEnd        += sign * scaleEndGrowth
 		powerSimilarity += sign * powerSimilarityGrowth
-		powerScale += sign * powerScaleGrowth
+		powerScale      += sign * powerScaleGrowth
 		
-		updateSlider("rStart")
-		updateSlider("rEnd")
-		updateSlider("scaleStart")
-		updateSlider("scaleEnd")
-		updateSlider("powerSimilarity")
-		updateSlider("powerScale")
+		for (let varr in parameters) {
+			// enforce bounds
+			window[varr] = Math.max(min[varr], Math.min(window[varr], max[varr]))
+			updateSlider(varr)
+		}
 	}
 	updateImages()
 }
-
 
 function loadAllImages(callback) {
 	// image loading is not synchronous in PIXI.Texture and PIXI.Sprite.
@@ -376,7 +342,7 @@ function initImage(image) {
 	image.sprite = sprite
 	
 	image.alpha = currentAlpha
-	currentAlpha += 1/images.length*(τ-titelKeilAngle)
+	currentAlpha += 1/images.length*(τ-wedgeAngle)
 	
 	sprite.interactive = true
 	// turns pointer to hand on mouseover
@@ -434,22 +400,21 @@ function moveToFront(sprite) {
 
 function moveToBack(sprite) {
 	stage.setChildIndex(sprite, 0)
-	// stage.removeChild(sprite)
-	// stage.addChild(sprite)
+}
+
+function addToInfoBox(string) {
+	var li = infoBox.appendChild(document.createElement("li"))
+	li.appendChild(document.createTextNode(string))
 }
 
 function updateImages(newCenter = centeredImage) {
 	centeredImage = newCenter
 	
-	while (infoBox.firstChild) {
+	while (infoBox.firstChild)
 		infoBox.removeChild(infoBox.firstChild)
-	}
-	function addPoint(string) {
-		var li = infoBox.appendChild(document.createElement("li"))
-		li.appendChild(document.createTextNode(string))
-	}
-	// TODO display image metadata
-	// addPoint(centeredImage.metadata...)
+	for (key in centeredImage.meta)
+		if (centeredImage.meta[key] !== undefined)
+			addToInfoBox(centeredImage.meta[key])
 	
 	startTransition()
 	images.forEach(img => {
@@ -467,60 +432,6 @@ function renderLoop() {
 	images.forEach(img => positionImage(w, h, img))
 	pixiRenderer.render(stage)
 	requestAnimationFrame(renderLoop)
-}
-
-// default: Generate a Bates distribution of 10 random variables.
-function createHistogram(values = d3.range(1000).map(d3.random.bates(10))) {
-	var formatCount = d3.format(",.0f");
-	
-	var margin = {top: 10, right: 30, bottom: 30, left: 30},
-		width = 1500 - margin.left - margin.right,
-		height = 500 - margin.top - margin.bottom;
-	
-	var x = d3.scale.linear()
-		.domain([0, 1])
-		.range([0, width]);
-
-	var data = d3.layout.histogram()
-		.bins(x.ticks(100))
-		(values);
-	
-	var y = d3.scale.linear()
-		.domain([0, d3.max(data, function(d) { return d.y; })])
-		.range([height, 0]);
-	
-	var xAxis = d3.svg.axis()
-		.scale(x)
-		.orient("bottom");
-	
-	var svg = d3.select("body").append("svg")
-		.attr("width", width + margin.left + margin.right)
-		.attr("height", height + margin.top + margin.bottom)
-		.append("g")
-		.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-	
-	var bar = svg.selectAll(".bar")
-		.data(data)
-		.enter().append("g")
-		.attr("class", "bar")
-		.attr("transform", function(d) { return "translate(" + x(d.x) + "," + y(d.y) + ")"; });
-	
-	bar.append("rect")
-		.attr("x", 1)
-		.attr("width", x(data[0].dx) - 1)
-		.attr("height", function(d) { return height - y(d.y); });
-	
-	bar.append("text")
-		.attr("dy", ".75em")
-		.attr("y", 6)
-		.attr("x", x(data[0].dx) / 2)
-		.attr("text-anchor", "middle")
-		.text(function(d) { return formatCount(d.y); });
-	
-	svg.append("g")
-		.attr("class", "x axis")
-		.attr("transform", "translate(0," + height + ")")
-		.call(xAxis);
 }
 
 

@@ -33,12 +33,13 @@ body {
 	position: fixed;
 	top: 2%;
 	right: 2%;
-	color: white;
-	text-shadow: 1px 1px 2px black;
+	color: #000000;
+	font-weight: bold;
+	text-shadow: 0px 0px 3px #ffffff;
 	font-size: 100%;
 	background-color: transparent;
 	border-radius: 5px;
-	padding: 5px;
+	padding: 10px;
 	list-style-type: none;
 }
 #controls li {
@@ -53,12 +54,15 @@ body {
 	opacity: 0.2;
 }
 #controls:hover {
-	background-color: rgba(255, 255, 255, 0.2);
+	background-color: rgba(230, 244, 255, 0.61);
 }
 #controls:hover li {
 	display: block;
 }
 #controls a {
-	color: #d3e1f0;
+	color: #272d32;
 	text-align: center;
+}
+#controls li button {
+	margin: 10px 5px;
 }

@@ -2,26 +2,26 @@ var fs = require('fs')
 var threadPool = require('./threadPool.js')
 
 var originalPath = "upload/files/"
-//var originalPath = "original/"
 
 console.assert(fs.statSync(originalPath).isDirectory())
 
-var images = fs.readdirSync(originalPath).map(e => ({file: e}))
-	// exclude hidden files
-	// .filter(e => !(/(^|\/)\.[^\/\.]/g).test(e))
-images = images.filter(e => e.file.endsWith(".jpg"))
-console.log(images)
-// images.forEach(e => console.assert(e.file.endsWith(".jpg")))
+var images = fs.readdirSync(originalPath).map(e => ({file: e, meta: {}}))
+images = images.filter(e => e.file.match(/\.(jpg|gif|bmp|png)$/g) !== null)
+console.log("Processing "+images.length+" images.")
+// console.log(images.map(e => e.file))
 images.forEach(e => e.similarity = new Array(images.length).fill(false))
 
+// TODO is currently resized even if source image is smaller. avoid upscaling
 var areasToCreate = [1000,10000,100000,1000000]
 areasToCreate.forEach(area => {
 	var dir = "area"+area+"/"
 	
 	try {
 		fs.statSync(dir).isDirectory()
+		console.log("skipping resize to area: "+area+"px, because is already exists")
 	} catch (e) {
 		// directory does not exist
+		console.log("resizing to area: "+area+"px")
 		fs.mkdirSync(dir)
 		images.forEach(img => {
 			var cmd = "convert '"+originalPath+img.file+"' -resize "+area+"@ '"+dir+img.file+"'"
@@ -45,9 +45,9 @@ threadPool.run(() => {
 				var n = match.map(e => Number(e))
 				// new Date(year, month, day, hour, minute, second, millisecond)
 				var date = new Date(n[1], n[2]-1/*!*/, n[3], n[4], n[5], n[6])
-				img1.date = date.getTime() // number ... better for JSON
+				img1.meta.date = date.getTime() // number ... better for JSON
 			} else {
-				img1.date = null // "undefined" is not taken into JSON
+				img1.meta.date = null // "undefined" is not taken into JSON
 			}
 		})
 		
@@ -76,7 +76,9 @@ threadPool.run(() => {
 		// high value is low similarity
 		// reverse and normalise into [0,1]
 		var max = Math.max(...images.map(e => Math.max(...e.similarity)))
-		images.forEach(e => e.similarity = e.similarity.map(e => Number((1-e/max).toFixed(4))))
+		images.forEach(e => e.similarity = e.similarity.map(e => 1-e/max))
+		equaliseSimilarity()
+		images.forEach(e => e.similarity = e.similarity.map(e => Number(e.toFixed(4))))
 		
 		fs.writeFileSync("images.json", JSON.stringify(images))
 		
@@ -86,3 +88,29 @@ threadPool.run(() => {
 })
 
 
+
+
+// https://martin-thoma.com/calculate-histogram-equalization/
+// assumes values are in [0,1]
+function equaliseSimilarity() {
+	const numberOfBuckets = 500
+	var flatSim = [].concat(...images.map(e => e.similarity))
+	var buckets = new Array(numberOfBuckets).fill(1).map((e,i) => (i+1)/numberOfBuckets)
+	// accumulated histogram
+	var accu = buckets.map(e => flatSim.filter(x => x<=e).length)
+	console.assert(accu[accu.length-1] === flatSim.length)
+	// into [0,1]
+	var normalised = accu.map(e => e/flatSim.length)
+	
+	// TODO simplify.
+	var bucketIndex = function(e) {
+		var bucket = 0
+		while (e > buckets[bucket])
+			bucket++
+		return bucket
+	}
+	
+	images.forEach(e => e.similarity = e.similarity.map(e => normalised[bucketIndex(e)]))
+	// but ensure that an image retains TO ITSELF the maximum similarity 1
+	images.forEach((e,i) => e.similarity[i] = 1)
+}
