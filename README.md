@@ -1,6 +1,8 @@
 Monadic Images
 ====
 
+Inspired by http://mariandoerk.de/monadicexploration/
+
 File permissions need to be to correctly for Apache-PHP to be able r/w/x in images/, images/upload/files/, etc.
 
 Requires Javascript Harmony support in Browser and NodeJS (>v6.2).

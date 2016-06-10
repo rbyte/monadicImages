@@ -10,12 +10,12 @@ function getFiles() {
 			// echo PHP_INT_MAX; // may be 2 147 483 647 => 2GiB => larger files are not reported correctly
 			// may produce: Warning: filesize(): stat failed
 			// @ suppresses Warning
-			// $size = @filesize($dir.$filename);
+			$size = @filesize($dir.$filename);
 			
 			// returns number as string!
 			// if file does not exist returns empty string, and in JS: Number("") === 0, which is ok
 			// TODO OSX: #stat: illegal option -- -
-			$size = exec('stat --printf="%s" "'.$dir.$filename.'"');
+			// $size = exec('stat --printf="%s" "'.$dir.$filename.'"');
 			// append
 			$files[] = array('name' => $filename, 'size' => ($size === false ? 0 : $size));
 		}
