@@ -291,14 +291,7 @@ function updateScreenElemsSize() {
 function wheelMove(e) {
 	e.preventDefault()
 	var wheelMovement = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)))
-	// altKey, ctrlKey, shiftKey
-	
-	if (e.shiftKey) {
-		// Firefox: shift + mouseWheel down => go back in history ...
-		powerSimilarity += wheelMovement*0.05
-	} else {
-		zoom(wheelMovement)
-	}
+	zoom(wheelMovement)
 	updateImages()
 }
 
