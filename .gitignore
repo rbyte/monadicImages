@@ -1,6 +1,6 @@
 images/area*/
 images/SAMPLE*/
-
+images/upload/files/*
 images/*.json
 images/*.log
 node_modules/
