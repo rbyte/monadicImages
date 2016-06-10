@@ -9,3 +9,5 @@ PHP needs to be able to exec(node...). For this, apache needs to have nodejs in 
 http://stackoverflow.com/questions/6833939/path-environment-variable-for-apache2-on-mac
 
 Requires ImageMagick on server.
+
+Security (!): use ~.htaccess

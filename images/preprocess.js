@@ -2,11 +2,10 @@ var fs = require('fs')
 var threadPool = require('./threadPool.js')
 
 var originalPath = "upload/files/"
-
 console.assert(fs.statSync(originalPath).isDirectory())
 
 var images = fs.readdirSync(originalPath).map(e => ({file: e, meta: {}}))
-images = images.filter(e => e.file.match(/\.(jpg|gif|bmp|png)$/g) !== null)
+images = images.filter(e => e.file.match(/\.(jpg|jpeg|tif|tiff|webp|gif|bmp|png)$/i) !== null)
 console.log("Processing "+images.length+" images.")
 // console.log(images.map(e => e.file))
 images.forEach(e => e.similarity = new Array(images.length).fill(false))
@@ -38,16 +37,16 @@ threadPool.run(() => {
 		var cmd = "identify -format '%[exif:DateTimeOriginal]' "+originalPath+img1.file
 		// if (false)
 		threadPool.add(cmd, function(error, stdout, stderr) {
-			// some images may not have EXIF data, e.g. panoramas
+			// some images may not have EXIF data
 			// "2008:10:11 16:42:31"
 			var match = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(stdout)
 			if (match) {
 				var n = match.map(e => Number(e))
 				// new Date(year, month, day, hour, minute, second, millisecond)
 				var date = new Date(n[1], n[2]-1/*!*/, n[3], n[4], n[5], n[6])
-				img1.meta.date = date.getTime() // number ... better for JSON
+				img1.date = date.getTime() // number ... better for JSON
 			} else {
-				img1.meta.date = null // "undefined" is not taken into JSON
+				img1.date = null // "undefined" is not taken into JSON
 			}
 		})
 		
@@ -86,9 +85,6 @@ threadPool.run(() => {
 	})
 	
 })
-
-
-
 
 // https://martin-thoma.com/calculate-histogram-equalization/
 // assumes values are in [0,1]

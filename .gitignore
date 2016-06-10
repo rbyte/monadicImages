@@ -1,5 +1,7 @@
 workbench/
-images/*/
+images/area*/
+images/SAMPLE*/
+images/upload/files/*
 images/*.csv
 images/*.json
 node_modules/

@@ -75,13 +75,13 @@ function init() {
 		images.forEach(e => e.getPath = function(areaIdx = this.areaIdxUsed) {
 			return "images/area"+availableImageSizesByArea[areaIdx]+"/"+this.file
 		})
-		images.forEach(e => e.meta.date = e.meta.date ? new Date(e.meta.date) : undefined)
+		images.forEach(e => e.date = e.date ? new Date(e.date) : undefined)
 		
 		images.sort((a,b) => {
 			// compare by date, fall back to compare by name if no date available
-			if (!a.meta.date || !b.meta.date)
+			if (!a.date || !b.date)
 				return a.file < b.file ? -1 : 1
-			return a.meta.date < b.meta.date ? -1 : 1
+			return a.date < b.date ? -1 : 1
 		})
 		
 		infoBox = document.querySelector("#detailedInfo")

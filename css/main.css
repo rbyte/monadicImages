@@ -49,12 +49,12 @@ body {
 	display: block;
 	text-align: right;
 }
-#controls li:first-child img {
+#gear {
 	height: 25px;
 	opacity: 0.2;
 }
 #controls:hover {
-	background-color: rgba(230, 244, 255, 0.61);
+	background-color: rgba(230, 244, 255, 0.4);
 }
 #controls:hover li {
 	display: block;
@@ -64,5 +64,13 @@ body {
 	text-align: center;
 }
 #controls li button {
+	padding: 2px;
 	margin: 10px 5px;
+}
+#controls li input {
+	margin: 0 5px;
+	vertical-align: middle;
+}
+#controls li {
+	margin: 5px 0;
 }

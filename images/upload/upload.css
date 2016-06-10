@@ -1,0 +1,97 @@
+body {
+	font-family: sans-serif;
+	margin: 3% 3% 7% 3%;
+}
+
+#fileselect {
+	/* hide label */
+	/*color: transparent;*/
+}
+
+
+#fileselect {
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	overflow: hidden;
+	position: absolute;
+	z-index: -1;
+}
+#fileselect + label {
+	padding: .4em .8em;
+	font-size: 1.25em;
+	font-weight: 700;
+	color: white;
+	background-color: grey;
+	display: inline-block;
+	cursor: pointer;
+}
+#fileselect + label img {
+	width: 30px;
+	padding-right: .5em;
+}
+
+#fileselect:focus + label,
+#fileselect + label:hover {
+	background-color: red;
+}
+
+
+#upload.dragover {
+	color: #f00;
+	background-color: rgb(255, 220, 220);
+	border-color: #f00;
+	border-style: solid;
+	box-shadow: inset 0 3px 4px #888;
+}
+#upload {
+	display: inline-block;
+	text-align: center;
+	font-size: 18px;
+	padding: 1em;
+	margin: 1em 0;
+	color: #777;
+	border: 2px dashed #777;
+	border-radius: 7px;
+}
+#fileTable {
+	text-align: left;
+	padding-top: 1em;
+}
+#fileTable td {
+	/*border: 1px solid grey;*/
+	padding: 2px 10px;
+	color: black;
+}
+#fileTable td:nth-child(2) {
+	color: grey;
+	text-align: right;
+}
+#fileTable tr:nth-child(even) {
+	background-color: rgba(0, 0, 0, 0.07);
+}
+#fileTable td i {
+	color: darkorchid;
+}
+#fileTable td.message {
+	color: black;
+	background-color: rgb(255, 179, 184);
+}
+progress.failure {
+	background-color: red;
+}
+progress.failure::-webkit-progress-value {
+	background-color: red;
+}
+progress.failure::-moz-progress-bar {
+	background-color: red;
+}
+progress.done {
+	background-color: greenyellow;
+}
+progress.done::-webkit-progress-value {
+	background-color: greenyellow;
+}
+progress.done::-moz-progress-bar {
+	background-color: greenyellow;
+}

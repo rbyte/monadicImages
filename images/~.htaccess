@@ -1,4 +1,4 @@
-<FilesMatch "\.(sh|js|html|php)$"> 
+<FilesMatch "\.(sh|js|html|php|log)$"> 
 	AuthName "Member Only"
 	AuthType Basic
 	AuthUserFile .htpasswd
