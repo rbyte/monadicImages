@@ -5,6 +5,6 @@ rm -rf area100000
 rm -rf area1000000
 rm -rf upload/files/*
 rm -f images.json
-echo "{}" > customParameters.json
+rm -f customParameters.json
 
 echo "clearAll.sh done"

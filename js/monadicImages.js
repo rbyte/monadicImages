@@ -54,7 +54,7 @@ function init() {
 		for (let varr in parameters) {
 			let [value, _min, _max, _step, _description] = parameters[varr]
 			window[varr] = value
-			if (customParameters[varr])
+			if (customParameters && customParameters[varr])
 				window[varr] = customParameters[varr]
 			if (localStorage && localStorage.getItem(varr))
 				window[varr] = Number(localStorage.getItem(varr))
@@ -66,6 +66,7 @@ function init() {
 			// parameters[varr] is kept to refer back to defaults
 		}
 		
+		console.assert(imgs instanceof Array)
 		images = imgs
 		// retain indices for later referencing (after sort reordered array)
 		// important for similarity indices
@@ -173,8 +174,14 @@ function withLoadedJSONfiles(fileNamesArray, callback) {
 		var xhr = new XMLHttpRequest()
 		xhr.open("GET", e)
 		xhr.onload = function() {
-			result[i] = JSON.parse(xhr.responseText)
-			if (result.every(e => e))
+			if (this.status === 404) { // file not found
+				console.log(e+" not found.")
+				result[i] = null
+			} else {
+				console.assert(this.status === 200)
+				result[i] = JSON.parse(xhr.responseText)
+			}
+			if (result.every(e => e !== false))
 				callback(result)
 		}
 		xhr.send()

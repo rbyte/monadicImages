@@ -1,7 +1,7 @@
-workbench/
 images/area*/
 images/SAMPLE*/
 images/upload/files/*
-images/*.csv
 images/*.json
+images/*.log
 node_modules/
+workbench/
